@@ -1,14 +1,16 @@
 import { MongoClient } from "mongodb";
 
-const uri = process.env.MONGODB_URI as string;
-const options = {};
+const uri = process.env.MONGODB_URI || "mongodb://localhost:27017/saada-students-union";
 
-let client;
+// MongoDB connection options with better error handling
+const options = {
+  maxPoolSize: 10,
+  serverSelectionTimeoutMS: 5000,
+  socketTimeoutMS: 45000,
+};
+
+let client: MongoClient;
 let clientPromise: Promise<MongoClient>;
-
-if (!process.env.MONGODB_URI) {
-  throw new Error("Please add your MongoDB URI to .env.local");
-}
 
 if (process.env.NODE_ENV === "development") {
   // In development mode, use a global variable so that the value
@@ -23,5 +25,11 @@ if (process.env.NODE_ENV === "development") {
   client = new MongoClient(uri, options);
   clientPromise = client.connect();
 }
+
+// Add error handling for the connection
+clientPromise.catch((error) => {
+  console.error("MongoDB connection error:", error);
+  console.log("Please make sure MongoDB is running and accessible at:", uri);
+});
 
 export default clientPromise; 

@@ -38,9 +38,12 @@ import {
   Globe,
   Lock,
   Brain,
+  LogOut,
+  User,
 } from "lucide-react"
-import { useSession, signOut } from "next-auth/react";
+import { useAuth } from "@/hooks/useAuth";
 import { useRouter } from "next/navigation";
+import { signOut } from "next-auth/react";
 
 type Quiz = {
   _id: any;
@@ -60,8 +63,40 @@ type Question = {
 };
 
 export default function AdminPage() {
-  const { data: session, status } = useSession();
+  const { user, isAuthenticated, isAdmin, canAccessAdmin, status } = useAuth();
   const router = useRouter();
+
+  // Redirect if not authenticated or not admin
+  useEffect(() => {
+    if (status === "loading") return;
+    
+    if (!isAuthenticated) {
+      router.push("/login?callbackUrl=/admin");
+      return;
+    }
+    
+    if (!canAccessAdmin()) {
+      router.push("/unauthorized");
+      return;
+    }
+  }, [isAuthenticated, canAccessAdmin, status, router]);
+
+  // Show loading state
+  if (status === "loading") {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading admin panel...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Don't render if not authenticated or not admin
+  if (!isAuthenticated || !canAccessAdmin()) {
+    return null;
+  }
 
   // All hooks at the top!
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -110,6 +145,10 @@ export default function AdminPage() {
     }
     fetchQuizzes();
   }, []);
+
+  const handleSignOut = async () => {
+    await signOut({ callbackUrl: "/" });
+  };
 
   async function handleLiveQuizSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -249,996 +288,667 @@ export default function AdminPage() {
     if (!confirm("Are you sure you want to delete this question?")) return;
     
     try {
-      // For simplicity, we're just removing it from the UI
-      // In a real app, you'd make an API call to delete it from the database
-      setQuizQuestions(quizQuestions.filter(q => q._id !== questionId));
+      const res = await fetch(`/api/quiz/questions/${questionId}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error("Failed to delete question");
       
-      // Update the quiz's question count in the UI
-      setQuizzes(quizzes.map(q => 
-        q._id === currentQuizId ? {...q, questionCount: Math.max(0, (q.questionCount || 0) - 1)} : q
-      ));
+      setQuizQuestions(prevQuestions => 
+        prevQuestions.filter(q => q._id !== questionId)
+      );
     } catch (error: any) {
       console.error("Error deleting question:", error);
-      alert("Failed to delete question");
+      alert("Failed to delete question: " + error.message);
     }
   }
 
   function handleEditQuiz(quizId: string) {
-    alert("Edit quiz functionality would be implemented here");
+    // Implementation for editing quiz
+    console.log("Edit quiz:", quizId);
   }
 
   async function handleDeleteQuiz(quizId: string) {
     if (!confirm("Are you sure you want to delete this quiz?")) return;
     
     try {
-      // For simplicity, we're just removing it from the UI
-      // In a real app, you'd make an API call to delete it from the database
-      setQuizzes(quizzes.filter(q => q._id !== quizId));
+      const res = await fetch(`/api/quiz/${quizId}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error("Failed to delete quiz");
+      
+      setQuizzes(prevQuizzes => 
+        prevQuizzes.filter(q => q._id !== quizId)
+      );
     } catch (error: any) {
       console.error("Error deleting quiz:", error);
-      alert("Failed to delete quiz");
+      alert("Failed to delete quiz: " + error.message);
     }
   }
 
-  // Conditional rendering instead of early returns
-  if (status === "loading") return <div>Loading...</div>;
-  if (!session) {
-    router.push("/login");
-    return null;
-  }
-  if (session.user?.email !== "admin@saada.com") {
-    return <div>Access denied. You are not an admin.</div>;
-  }
-
-  const dashboardStats = [
-    { label: "Total Users", value: "2,450", change: "+12%", icon: Users, color: "text-blue-600" },
-    { label: "Active Wings", value: "11", change: "+1", icon: Shield, color: "text-green-600" },
-    { label: "Blog Posts", value: "156", change: "+8", icon: FileText, color: "text-purple-600" },
-    { label: "Quiz Participants", value: "890", change: "+23%", icon: Activity, color: "text-orange-600" },
-  ]
-
-  const recentUsers = [
-    {
-      id: 1,
-      name: "Ahmed Hassan",
-      email: "ahmed@example.com",
-      role: "Student",
-      status: "Active",
-      joinDate: "2025-01-15",
-    },
-    {
-      id: 2,
-      name: "Fatima Ali",
-      email: "fatima@example.com",
-      role: "Student",
-      status: "Active",
-      joinDate: "2025-01-14",
-    },
-    {
-      id: 3,
-      name: "Omar Khalil",
-      email: "omar@example.com",
-      role: "Wing Leader",
-      status: "Active",
-      joinDate: "2025-01-13",
-    },
-    {
-      id: 4,
-      name: "Aisha Rahman",
-      email: "aisha@example.com",
-      role: "Student",
-      status: "Pending",
-      joinDate: "2025-01-12",
-    },
-  ]
-
-  const blogPosts = [
-    {
-      id: 1,
-      title: "Student Life at SA'ADA",
-      author: "Ahmed Hassan",
-      status: "Published",
-      date: "2025-01-15",
-      views: 245,
-    },
-    {
-      id: 2,
-      title: "Cultural Diversity in Education",
-      author: "Fatima Ali",
-      status: "Draft",
-      date: "2025-01-14",
-      views: 0,
-    },
-    { id: 3, title: "Leadership Development", author: "Omar Khalil", status: "Review", date: "2025-01-13", views: 189 },
-    {
-      id: 4,
-      title: "Academic Excellence Tips",
-      author: "Aisha Rahman",
-      status: "Published",
-      date: "2025-01-12",
-      views: 312,
-    },
-  ]
-
-  const wings = [
-    { id: 1, name: "Media Wing", leader: "Hassan Ahmed", members: 25, status: "Active", activities: 12 },
-    { id: 2, name: "Medical Wing", leader: "Mariam Said", members: 18, status: "Active", activities: 8 },
-    { id: 3, name: "Discourse Hub", leader: "Yusuf Ibrahim", members: 22, status: "Active", activities: 15 },
-    { id: 4, name: "English Club", leader: "Zainab Malik", members: 30, status: "Active", activities: 10 },
-  ]
-
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="container mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-800">Admin Dashboard</h1>
-            <p className="text-gray-600">Manage SA'ADA Students' Union website and activities</p>
-          </div>
-          <div className="flex items-center space-x-4">
-            <Button variant="outline" size="sm">
-              <Bell className="w-4 h-4 mr-2" />
-              Notifications
-            </Button>
-            <Button size="sm">
-              <Plus className="w-4 h-4 mr-2" />
-              Quick Add
-            </Button>
+      {/* Header */}
+      <header className="bg-white shadow-sm border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center py-4">
+            <div className="flex items-center space-x-4">
+              <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
+                <Shield className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h1 className="text-xl font-semibold text-gray-900">Admin Panel</h1>
+                <p className="text-sm text-gray-500">Welcome back, {user?.name}</p>
+              </div>
+            </div>
+            
+            <div className="flex items-center space-x-4">
+              <Badge variant="outline" className="bg-blue-50 text-blue-700">
+                {user?.role}
+              </Badge>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm">
+                    <User className="w-4 h-4 mr-2" />
+                    {user?.name}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem>
+                    <User className="w-4 h-4 mr-2" />
+                    Profile
+                  </DropdownMenuItem>
+                  <DropdownMenuItem>
+                    <Settings className="w-4 h-4 mr-2" />
+                    Settings
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleSignOut}>
+                    <LogOut className="w-4 h-4 mr-2" />
+                    Sign Out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
         </div>
+      </header>
 
-        {/* Main Content */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8">
-          <TabsList className="grid w-full grid-cols-3 gap-1 lg:w-auto lg:grid-cols-6">
-            <TabsTrigger
-              value="dashboard"
-              className="flex flex-col sm:flex-row items-center justify-center space-y-1 sm:space-y-0 sm:space-x-2 text-xs sm:text-sm p-2"
-            >
-              <BarChart3 className="w-3 h-3 sm:w-4 sm:h-4" />
-              <span className="hidden sm:inline">Dashboard</span>
-              <span className="sm:hidden">Dash</span>
+      {/* Main Content */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          <TabsList className="grid w-full grid-cols-5">
+            <TabsTrigger value="dashboard" className="flex items-center space-x-2">
+              <BarChart3 className="w-4 h-4" />
+              <span>Dashboard</span>
             </TabsTrigger>
-            <TabsTrigger
-              value="users"
-              className="flex flex-col sm:flex-row items-center justify-center space-y-1 sm:space-y-0 sm:space-x-2 text-xs sm:text-sm p-2"
-            >
-              <Users className="w-3 h-3 sm:w-4 sm:h-4" />
+            <TabsTrigger value="live-quiz" className="flex items-center space-x-2">
+              <Brain className="w-4 h-4" />
+              <span>Live Quiz</span>
+            </TabsTrigger>
+            <TabsTrigger value="quizzes" className="flex items-center space-x-2">
+              <FileText className="w-4 h-4" />
+              <span>Quizzes</span>
+            </TabsTrigger>
+            <TabsTrigger value="users" className="flex items-center space-x-2">
+              <Users className="w-4 h-4" />
               <span>Users</span>
             </TabsTrigger>
-            <TabsTrigger
-              value="content"
-              className="flex flex-col sm:flex-row items-center justify-center space-y-1 sm:space-y-0 sm:space-x-2 text-xs sm:text-sm p-2"
-            >
-              <FileText className="w-3 h-3 sm:w-4 sm:h-4" />
-              <span className="hidden sm:inline">Content</span>
-              <span className="sm:hidden">Posts</span>
-            </TabsTrigger>
-            <TabsTrigger
-              value="wings"
-              className="flex flex-col sm:flex-row items-center justify-center space-y-1 sm:space-y-0 sm:space-x-2 text-xs sm:text-sm p-2"
-            >
-              <Shield className="w-3 h-3 sm:w-4 sm:h-4" />
-              <span>Wings</span>
-            </TabsTrigger>
-            <TabsTrigger
-              value="analytics"
-              className="flex flex-col sm:flex-row items-center justify-center space-y-1 sm:space-y-0 sm:space-x-2 text-xs sm:text-sm p-2"
-            >
-              <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4" />
-              <span className="hidden sm:inline">Analytics</span>
-              <span className="sm:hidden">Stats</span>
-            </TabsTrigger>
-            <TabsTrigger
-              value="settings"
-              className="flex flex-col sm:flex-row items-center justify-center space-y-1 sm:space-y-0 sm:space-x-2 text-xs sm:text-sm p-2"
-            >
-              <Settings className="w-3 h-3 sm:w-4 sm:h-4" />
-              <span className="hidden sm:inline">Settings</span>
-              <span className="sm:hidden">Config</span>
-            </TabsTrigger>
-            <TabsTrigger
-              value="quizzes"
-              className="flex flex-col sm:flex-row items-center justify-center space-y-1 sm:space-y-0 sm:space-x-2 text-xs sm:text-sm p-2"
-            >
-              <Brain className="w-3 h-3 sm:w-4 sm:h-4" />
-              <span className="hidden sm:inline">Quizzes</span>
-              <span className="sm:hidden">Quiz</span>
+            <TabsTrigger value="analytics" className="flex items-center space-x-2">
+              <TrendingUp className="w-4 h-4" />
+              <span>Analytics</span>
             </TabsTrigger>
           </TabsList>
 
           {/* Dashboard Tab */}
-          <TabsContent value="dashboard" className="space-y-8">
-            <Card className="mb-8">
-              <CardHeader>
-                <CardTitle>Live Quiz Control</CardTitle>
-                <CardDescription>Set the current live quiz question and options for participants.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleLiveQuizSubmit} className="space-y-4">
-                  <Input
-                    type="text"
-                    placeholder="Quiz Question"
-                    value={liveQuiz.question}
-                    onChange={e => setLiveQuiz(q => ({ ...q, question: e.target.value }))}
-                    required
-                  />
-                  {liveQuiz.options.map((opt, idx) => (
-                    <div key={idx} className="flex items-center gap-2 mt-2">
-                      <input
-                        type="radio"
-                        name="correct"
-                        checked={liveQuiz.correct === idx}
-                        onChange={() => setLiveQuiz(q => ({ ...q, correct: idx }))}
-                        className="accent-blue-600"
-                      />
-                      <Input
-                        type="text"
-                        placeholder={`Option ${idx + 1}`}
-                        value={opt}
-                        onChange={e => setLiveQuiz(q => ({ ...q, options: q.options.map((o, i) => i === idx ? e.target.value : o) }))}
-                        required
-                      />
-                      {liveQuiz.options.length > 2 && (
-                        <Button type="button" variant="destructive" size="sm" onClick={() => setLiveQuiz(q => ({ ...q, options: q.options.filter((_, i) => i !== idx), correct: q.correct === idx ? 0 : q.correct > idx ? q.correct - 1 : q.correct }))}>
-                          Remove
-                        </Button>
-                      )}
-                      <span className="text-xs text-muted-foreground">Correct</span>
-                    </div>
-                  ))}
-                  <div className="flex gap-2">
-                    <Button type="button" variant="outline" onClick={() => setLiveQuiz(q => ({ ...q, options: [...q.options, ""] }))}>
-                      Add Option
-                    </Button>
-                    {liveQuiz.options.length > 2 && (
-                      <Button type="button" variant="destructive" onClick={() => setLiveQuiz(q => ({ ...q, options: q.options.slice(0, -1) }))}>
-                        Remove Option
-                      </Button>
-                    )}
-                  </div>
-                  <Button type="submit" disabled={liveQuizLoading} className="w-full">
-                    {liveQuizLoading ? "Saving..." : "Set Live Quiz"}
-                  </Button>
-                  {liveQuizSuccess && <div className="text-green-600 text-sm mt-2">Live quiz updated!</div>}
-                  {liveQuizError && <div className="text-red-600 text-sm mt-2">{liveQuizError}</div>}
-                </form>
-              </CardContent>
-            </Card>
-            {/* Stats Cards */}
-            <div className="grid gap-4 sm:gap-6 md:grid-cols-2 lg:grid-cols-4">
-              {dashboardStats.map((stat, index) => (
-                <Card key={index} className="hover:shadow-lg transition-shadow">
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-gray-600 mb-1">{stat.label}</p>
-                        <p className="text-2xl font-bold text-gray-800">{stat.value}</p>
-                        <p className="text-sm text-green-600 font-medium">{stat.change}</p>
-                      </div>
-                      <div
-                        className={`w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center ${stat.color}`}
-                      >
-                        <stat.icon className="w-6 h-6" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+          <TabsContent value="dashboard" className="space-y-6">
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Total Users</CardTitle>
+                  <Users className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">2,847</div>
+                  <p className="text-xs text-muted-foreground">+180 from last month</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Active Quizzes</CardTitle>
+                  <Brain className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">12</div>
+                  <p className="text-xs text-muted-foreground">+2 from last week</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Total Questions</CardTitle>
+                  <FileText className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">1,234</div>
+                  <p className="text-xs text-muted-foreground">+89 from last week</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">System Status</CardTitle>
+                  <Activity className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-green-600">Online</div>
+                  <p className="text-xs text-muted-foreground">All systems operational</p>
+                </CardContent>
+              </Card>
             </div>
 
-            {/* Recent Activity */}
-            <div className="grid lg:grid-cols-2 gap-8">
+            <div className="grid gap-6 md:grid-cols-2">
               <Card>
                 <CardHeader>
-                  <CardTitle>Recent User Registrations</CardTitle>
-                  <CardDescription>Latest users who joined the platform</CardDescription>
+                  <CardTitle>Recent Activity</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {recentUsers.slice(0, 4).map((user) => (
-                      <div key={user.id} className="flex items-center justify-between">
-                        <div className="flex items-center space-x-3">
-                          <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                            <Users className="w-4 h-4 text-blue-600" />
-                          </div>
-                          <div>
-                            <p className="font-semibold text-sm">{user.name}</p>
-                            <p className="text-xs text-gray-600">{user.email}</p>
-                          </div>
-                        </div>
-                        <Badge variant={user.status === "Active" ? "default" : "secondary"}>{user.status}</Badge>
+                    <div className="flex items-center space-x-4">
+                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium">New user registered</p>
+                        <p className="text-xs text-muted-foreground">2 minutes ago</p>
                       </div>
-                    ))}
+                    </div>
+                    <div className="flex items-center space-x-4">
+                      <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium">Quiz completed</p>
+                        <p className="text-xs text-muted-foreground">5 minutes ago</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-4">
+                      <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium">System maintenance</p>
+                        <p className="text-xs text-muted-foreground">1 hour ago</p>
+                      </div>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
 
               <Card>
                 <CardHeader>
-                  <CardTitle>Recent Blog Posts</CardTitle>
-                  <CardDescription>Latest content submissions</CardDescription>
+                  <CardTitle>Quick Actions</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4">
-                    {blogPosts.slice(0, 4).map((post) => (
-                      <div key={post.id} className="flex items-center justify-between">
-                        <div className="flex items-center space-x-3">
-                          <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                            <FileText className="w-4 h-4 text-green-600" />
-                          </div>
-                          <div>
-                            <p className="font-semibold text-sm">{post.title}</p>
-                            <p className="text-xs text-gray-600">by {post.author}</p>
-                          </div>
-                        </div>
-                        <Badge variant={post.status === "Published" ? "default" : "secondary"}>{post.status}</Badge>
-                      </div>
-                    ))}
+                  <div className="space-y-3">
+                    <Button className="w-full justify-start" variant="outline">
+                      <Plus className="w-4 h-4 mr-2" />
+                      Create New Quiz
+                    </Button>
+                    <Button className="w-full justify-start" variant="outline">
+                      <Users className="w-4 h-4 mr-2" />
+                      Manage Users
+                    </Button>
+                    <Button className="w-full justify-start" variant="outline">
+                      <Settings className="w-4 h-4 mr-2" />
+                      System Settings
+                    </Button>
+                    <Button className="w-full justify-start" variant="outline">
+                      <Database className="w-4 h-4 mr-2" />
+                      Backup Data
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
             </div>
           </TabsContent>
 
-          {/* Users Tab */}
-          <TabsContent value="users" className="space-y-8">
-            <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-gray-800">User Management</h2>
+          {/* Live Quiz Tab */}
+          <TabsContent value="live-quiz" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Live Quiz Management</CardTitle>
+                <CardDescription>
+                  Create and manage live quiz questions for real-time competitions
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleLiveQuizSubmit} className="space-y-4">
+                  <div>
+                    <label className="text-sm font-medium">Question</label>
+                    <Textarea
+                      placeholder="Enter the quiz question..."
+                      value={liveQuiz.question}
+                      onChange={(e) => setLiveQuiz({ ...liveQuiz, question: e.target.value })}
+                      className="mt-1"
+                    />
+                  </div>
+                  
+                  <div className="grid gap-4 md:grid-cols-2">
+                    {liveQuiz.options.map((option, index) => (
+                      <div key={index}>
+                        <label className="text-sm font-medium">Option {index + 1}</label>
+                        <Input
+                          placeholder={`Option ${index + 1}`}
+                          value={option}
+                          onChange={(e) => {
+                            const newOptions = [...liveQuiz.options];
+                            newOptions[index] = e.target.value;
+                            setLiveQuiz({ ...liveQuiz, options: newOptions });
+                          }}
+                          className="mt-1"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  
+                  <div>
+                    <label className="text-sm font-medium">Correct Answer</label>
+                    <select
+                      value={liveQuiz.correct}
+                      onChange={(e) => setLiveQuiz({ ...liveQuiz, correct: parseInt(e.target.value) })}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                    >
+                      {liveQuiz.options.map((option, index) => (
+                        <option key={index} value={index}>
+                          Option {index + 1}: {option || "Enter option"}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  {liveQuizError && (
+                    <div className="text-red-600 text-sm">{liveQuizError}</div>
+                  )}
+                  
+                  {liveQuizSuccess && (
+                    <div className="text-green-600 text-sm">Live quiz updated successfully!</div>
+                  )}
+                  
+                  <Button type="submit" disabled={liveQuizLoading}>
+                    {liveQuizLoading ? "Updating..." : "Update Live Quiz"}
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Quizzes Tab */}
+          <TabsContent value="quizzes" className="space-y-6">
+            <div className="flex justify-between items-center">
+              <div>
+                <h2 className="text-2xl font-bold">Quiz Management</h2>
+                <p className="text-gray-600">Create and manage scheduled quizzes</p>
+              </div>
+              
               <Dialog>
                 <DialogTrigger asChild>
                   <Button>
                     <Plus className="w-4 h-4 mr-2" />
-                    Add User
+                    Create Quiz
                   </Button>
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
-                    <DialogTitle>Add New User</DialogTitle>
-                    <DialogDescription>Create a new user account for the platform</DialogDescription>
-                  </DialogHeader>
-                  <div className="space-y-4">
-                    <Input placeholder="Full Name" />
-                    <Input placeholder="Email Address" type="email" />
-                    <Input placeholder="Phone Number" />
-                    <select className="w-full p-2 border rounded-md">
-                      <option>Select Role</option>
-                      <option>Student</option>
-                      <option>Wing Leader</option>
-                      <option>Admin</option>
-                    </select>
-                    <Button className="w-full">Create User</Button>
-                  </div>
-                </DialogContent>
-              </Dialog>
-            </div>
-
-            <Card>
-              <CardContent className="p-0">
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Email</TableHead>
-                        <TableHead>Role</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Join Date</TableHead>
-                        <TableHead>Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {recentUsers.map((user) => (
-                        <TableRow key={user.id}>
-                          <TableCell className="font-medium">{user.name}</TableCell>
-                          <TableCell>{user.email}</TableCell>
-                          <TableCell>
-                            <Badge variant="outline">{user.role}</Badge>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant={user.status === "Active" ? "default" : "secondary"}>{user.status}</Badge>
-                          </TableCell>
-                          <TableCell>{user.joinDate}</TableCell>
-                          <TableCell>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="sm">
-                                  <MoreHorizontal className="w-4 h-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent>
-                                <DropdownMenuItem>
-                                  <Eye className="w-4 h-4 mr-2" />
-                                  View Profile
-                                </DropdownMenuItem>
-                                <DropdownMenuItem>
-                                  <Edit className="w-4 h-4 mr-2" />
-                                  Edit User
-                                </DropdownMenuItem>
-                                <DropdownMenuItem className="text-red-600">
-                                  <Trash2 className="w-4 h-4 mr-2" />
-                                  Delete User
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Content Tab */}
-          <TabsContent value="content" className="space-y-8">
-            <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-gray-800">Content Management</h2>
-              <div className="flex space-x-4">
-                <Button variant="outline">
-                  <FileText className="w-4 h-4 mr-2" />
-                  Manage News
-                </Button>
-                <Button>
-                  <Plus className="w-4 h-4 mr-2" />
-                  New Post
-                </Button>
-              </div>
-            </div>
-
-            <Card>
-              <CardContent className="p-0">
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Title</TableHead>
-                        <TableHead>Author</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Views</TableHead>
-                        <TableHead>Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {blogPosts.map((post) => (
-                        <TableRow key={post.id}>
-                          <TableCell className="font-medium">{post.title}</TableCell>
-                          <TableCell>{post.author}</TableCell>
-                          <TableCell>
-                            <Badge
-                              variant={
-                                post.status === "Published"
-                                  ? "default"
-                                  : post.status === "Draft"
-                                    ? "secondary"
-                                    : "outline"
-                              }
-                            >
-                              {post.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>{post.date}</TableCell>
-                          <TableCell>{post.views}</TableCell>
-                          <TableCell>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="sm">
-                                  <MoreHorizontal className="w-4 h-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent>
-                                <DropdownMenuItem>
-                                  <Eye className="w-4 h-4 mr-2" />
-                                  Preview
-                                </DropdownMenuItem>
-                                <DropdownMenuItem>
-                                  <Edit className="w-4 h-4 mr-2" />
-                                  Edit Post
-                                </DropdownMenuItem>
-                                <DropdownMenuItem className="text-red-600">
-                                  <Trash2 className="w-4 h-4 mr-2" />
-                                  Delete Post
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Wings Tab */}
-          <TabsContent value="wings" className="space-y-8">
-            <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-gray-800">Wings Management</h2>
-              <Button>
-                <Plus className="w-4 h-4 mr-2" />
-                Add Wing
-              </Button>
-            </div>
-
-            <div className="grid gap-4 sm:gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {wings.map((wing) => (
-                <Card key={wing.id} className="hover:shadow-lg transition-shadow">
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-lg">{wing.name}</CardTitle>
-                      <Badge variant="default">Active</Badge>
-                    </div>
-                    <CardDescription>Led by {wing.leader}</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4 text-sm">
-                      <div>
-                        <p className="text-gray-600">Members</p>
-                        <p className="font-semibold">{wing.members}</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-600">Activities</p>
-                        <p className="font-semibold">{wing.activities}</p>
-                      </div>
-                    </div>
-                    <div className="flex space-x-2">
-                      <Button size="sm" variant="outline" className="flex-1 bg-transparent">
-                        <Eye className="w-4 h-4 mr-1" />
-                        View
-                      </Button>
-                      <Button size="sm" variant="outline" className="flex-1 bg-transparent">
-                        <Edit className="w-4 h-4 mr-1" />
-                        Edit
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </TabsContent>
-
-          {/* Analytics Tab */}
-          <TabsContent value="analytics" className="space-y-8">
-            <h2 className="text-2xl font-bold text-gray-800">Analytics & Reports</h2>
-
-            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <Card>
-                <CardContent className="p-6 text-center">
-                  <Globe className="w-8 h-8 text-blue-600 mx-auto mb-2" />
-                  <h3 className="font-semibold">Website Traffic</h3>
-                  <p className="text-2xl font-bold text-gray-800">12,450</p>
-                  <p className="text-sm text-green-600">+15% this month</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-6 text-center">
-                  <UserCheck className="w-8 h-8 text-green-600 mx-auto mb-2" />
-                  <h3 className="font-semibold">Active Users</h3>
-                  <p className="text-2xl font-bold text-gray-800">2,450</p>
-                  <p className="text-sm text-green-600">+8% this month</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-6 text-center">
-                  <MessageSquare className="w-8 h-8 text-purple-600 mx-auto mb-2" />
-                  <h3 className="font-semibold">Blog Engagement</h3>
-                  <p className="text-2xl font-bold text-gray-800">89%</p>
-                  <p className="text-sm text-green-600">+3% this month</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-6 text-center">
-                  <Activity className="w-8 h-8 text-orange-600 mx-auto mb-2" />
-                  <h3 className="font-semibold">Quiz Participation</h3>
-                  <p className="text-2xl font-bold text-gray-800">890</p>
-                  <p className="text-sm text-green-600">+23% this month</p>
-                </CardContent>
-              </Card>
-            </div>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Detailed Analytics</CardTitle>
-                <CardDescription>Comprehensive website and user analytics</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="h-64 flex items-center justify-center bg-gray-50 rounded-lg">
-                  <p className="text-gray-500">Analytics charts would be displayed here</p>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Settings Tab */}
-          <TabsContent value="settings" className="space-y-8">
-            <h2 className="text-2xl font-bold text-gray-800">System Settings</h2>
-
-            <div className="grid lg:grid-cols-2 gap-8">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center space-x-2">
-                    <Globe className="w-5 h-5" />
-                    <span>Website Settings</span>
-                  </CardTitle>
-                  <CardDescription>Configure general website settings</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Site Title</label>
-                    <Input defaultValue="SA'ADA STUDENTS' UNION" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Site Description</label>
-                    <Textarea defaultValue="Empowering Students through Unity and Knowledge" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Contact Email</label>
-                    <Input defaultValue="info@saadaunion.edu" />
-                  </div>
-                  <Button>Save Changes</Button>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center space-x-2">
-                    <Lock className="w-5 h-5" />
-                    <span>Security Settings</span>
-                  </CardTitle>
-                  <CardDescription>Manage security and access controls</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="font-semibold">Two-Factor Authentication</h4>
-                      <p className="text-sm text-gray-600">Enable 2FA for admin accounts</p>
-                    </div>
-                    <Button variant="outline" size="sm">
-                      Enable
-                    </Button>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="font-semibold">Password Policy</h4>
-                      <p className="text-sm text-gray-600">Enforce strong passwords</p>
-                    </div>
-                    <Button variant="outline" size="sm">
-                      Configure
-                    </Button>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="font-semibold">Session Timeout</h4>
-                      <p className="text-sm text-gray-600">Auto-logout after inactivity</p>
-                    </div>
-                    <Button variant="outline" size="sm">
-                      Set Time
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center space-x-2">
-                    <Database className="w-5 h-5" />
-                    <span>Database Management</span>
-                  </CardTitle>
-                  <CardDescription>Backup and maintenance tools</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="font-semibold">Database Backup</h4>
-                      <p className="text-sm text-gray-600">Last backup: 2 hours ago</p>
-                    </div>
-                    <Button variant="outline" size="sm">
-                      Backup Now
-                    </Button>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="font-semibold">System Maintenance</h4>
-                      <p className="text-sm text-gray-600">Optimize database performance</p>
-                    </div>
-                    <Button variant="outline" size="sm">
-                      Run Maintenance
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center space-x-2">
-                    <Mail className="w-5 h-5" />
-                    <span>Email Settings</span>
-                  </CardTitle>
-                  <CardDescription>Configure email notifications</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-2">SMTP Server</label>
-                    <Input placeholder="smtp.example.com" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-2">SMTP Port</label>
-                    <Input placeholder="587" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-2">From Email</label>
-                    <Input placeholder="noreply@saadaunion.edu" />
-                  </div>
-                  <Button>Save Email Settings</Button>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-          
-          {/* Quizzes Tab */}
-          <TabsContent value="quizzes" className="space-y-8">
-            <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-gray-800">Quiz Management</h2>
-              <Dialog>
-                <DialogTrigger asChild>
-                  <Button>
-                    <Plus className="w-4 h-4 mr-2" />
-                    Create New Quiz
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-[500px]">
-                  <DialogHeader>
                     <DialogTitle>Create New Quiz</DialogTitle>
-                    <DialogDescription>Add a new quiz event to the platform</DialogDescription>
+                    <DialogDescription>
+                      Add a new quiz to the system
+                    </DialogDescription>
                   </DialogHeader>
                   <form onSubmit={handleNewQuizSubmit} className="space-y-4">
                     <div>
-                      <label className="block text-sm font-medium mb-1">Quiz Title</label>
-                      <Input 
-                        placeholder="Weekly General Knowledge" 
-                        value={newQuiz.title} 
-                        onChange={(e) => setNewQuiz({...newQuiz, title: e.target.value})} 
-                        required 
+                      <label className="text-sm font-medium">Title</label>
+                      <Input
+                        placeholder="Quiz title"
+                        value={newQuiz.title}
+                        onChange={(e) => setNewQuiz({ ...newQuiz, title: e.target.value })}
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium mb-1">Difficulty</label>
-                      <select 
-                        className="w-full p-2 border rounded-md" 
+                      <label className="text-sm font-medium">Difficulty</label>
+                      <select
                         value={newQuiz.difficulty}
-                        onChange={(e) => setNewQuiz({...newQuiz, difficulty: e.target.value})}
-                        required
+                        onChange={(e) => setNewQuiz({ ...newQuiz, difficulty: e.target.value })}
+                        className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                       >
-                        <option value="">Select Difficulty</option>
-                        <option value="Beginner">Beginner</option>
+                        <option value="">Select difficulty</option>
+                        <option value="Easy">Easy</option>
                         <option value="Intermediate">Intermediate</option>
                         <option value="Advanced">Advanced</option>
-                        <option value="Mixed">Mixed</option>
                       </select>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-sm font-medium mb-1">Date</label>
-                        <Input 
-                          type="date" 
+                        <label className="text-sm font-medium">Date</label>
+                        <Input
+                          type="date"
                           value={newQuiz.date}
-                          onChange={(e) => setNewQuiz({...newQuiz, date: e.target.value})}
-                          required
+                          onChange={(e) => setNewQuiz({ ...newQuiz, date: e.target.value })}
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium mb-1">Time</label>
-                        <Input 
-                          type="time" 
+                        <label className="text-sm font-medium">Time</label>
+                        <Input
+                          type="time"
                           value={newQuiz.time}
-                          onChange={(e) => setNewQuiz({...newQuiz, time: e.target.value})}
-                          required
+                          onChange={(e) => setNewQuiz({ ...newQuiz, time: e.target.value })}
                         />
                       </div>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium mb-1">Prize</label>
-                      <Input 
-                        placeholder="Certificate + Badge" 
+                      <label className="text-sm font-medium">Prize</label>
+                      <Input
+                        placeholder="Prize description"
                         value={newQuiz.prize}
-                        onChange={(e) => setNewQuiz({...newQuiz, prize: e.target.value})}
+                        onChange={(e) => setNewQuiz({ ...newQuiz, prize: e.target.value })}
                       />
                     </div>
-                    <Button type="submit" className="w-full" disabled={quizSubmitting}>
+                    
+                    {quizSubmitError && (
+                      <div className="text-red-600 text-sm">{quizSubmitError}</div>
+                    )}
+                    
+                    <Button type="submit" disabled={quizSubmitting} className="w-full">
                       {quizSubmitting ? "Creating..." : "Create Quiz"}
                     </Button>
-                    {quizSubmitError && <p className="text-red-500 text-sm">{quizSubmitError}</p>}
                   </form>
                 </DialogContent>
               </Dialog>
             </div>
 
-            {/* Quiz List */}
             <Card>
               <CardHeader>
-                <CardTitle>Upcoming Quizzes</CardTitle>
-                <CardDescription>Manage scheduled quiz events</CardDescription>
+                <CardTitle>All Quizzes</CardTitle>
               </CardHeader>
-              <CardContent className="p-0">
-                <div className="overflow-x-auto">
+              <CardContent>
+                {quizLoading ? (
+                  <div className="text-center py-8">Loading quizzes...</div>
+                ) : (
                   <Table>
                     <TableHeader>
                       <TableRow>
                         <TableHead>Title</TableHead>
                         <TableHead>Difficulty</TableHead>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Time</TableHead>
+                        <TableHead>Date & Time</TableHead>
                         <TableHead>Questions</TableHead>
+                        <TableHead>Prize</TableHead>
                         <TableHead>Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {quizzes.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={6} className="text-center py-4 text-muted-foreground">
-                            No quizzes found. Create your first quiz!
+                      {quizzes.map((quiz) => (
+                        <TableRow key={quiz._id}>
+                          <TableCell className="font-medium">{quiz.title}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{quiz.difficulty}</Badge>
+                          </TableCell>
+                          <TableCell>{quiz.date} at {quiz.time}</TableCell>
+                          <TableCell>{quiz.questionCount}</TableCell>
+                          <TableCell>{quiz.prize}</TableCell>
+                          <TableCell>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm">
+                                  <MoreHorizontal className="w-4 h-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => handleManageQuestions(quiz._id)}>
+                                  <Eye className="w-4 h-4 mr-2" />
+                                  Manage Questions
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleEditQuiz(quiz._id)}>
+                                  <Edit className="w-4 h-4 mr-2" />
+                                  Edit
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleDeleteQuiz(quiz._id)}>
+                                  <Trash2 className="w-4 h-4 mr-2" />
+                                  Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </TableCell>
                         </TableRow>
-                      ) : (
-                        quizzes.map((quiz: Quiz) => (
-                          <TableRow key={quiz._id}>
-                            <TableCell className="font-medium">{quiz.title}</TableCell>
-                            <TableCell>
-                              <Badge variant="outline">{quiz.difficulty}</Badge>
-                            </TableCell>
-                            <TableCell>{quiz.date}</TableCell>
-                            <TableCell>{quiz.time}</TableCell>
-                            <TableCell>{quiz.questionCount || 0}</TableCell>
-                            <TableCell>
-                              <div className="flex space-x-2">
-                                <Button size="sm" variant="outline" onClick={() => handleManageQuestions(quiz._id)}>
-                                  <Plus className="w-3 h-3 mr-1" />
-                                  Questions
-                                </Button>
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" size="sm">
-                                      <MoreHorizontal className="w-4 h-4" />
-                                    </Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent>
-                                    <DropdownMenuItem onClick={() => handleEditQuiz(quiz._id)}>
-                                      <Edit className="w-4 h-4 mr-2" />
-                                      Edit Quiz
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem className="text-red-600" onClick={() => handleDeleteQuiz(quiz._id)}>
-                                      <Trash2 className="w-4 h-4 mr-2" />
-                                      Delete Quiz
-                                    </DropdownMenuItem>
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      )}
+                      ))}
                     </TableBody>
                   </Table>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Users Tab */}
+          <TabsContent value="users" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>User Management</CardTitle>
+                <CardDescription>
+                  Manage user accounts and permissions
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Role</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    <TableRow>
+                      <TableCell className="font-medium">John Doe</TableCell>
+                      <TableCell>john@example.com</TableCell>
+                      <TableCell>
+                        <Badge variant="outline">User</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge className="bg-green-100 text-green-800">Active</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Button variant="ghost" size="sm">
+                          <MoreHorizontal className="w-4 h-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Analytics Tab */}
+          <TabsContent value="analytics" className="space-y-6">
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Quiz Participation</CardTitle>
+                  <UserCheck className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">89%</div>
+                  <p className="text-xs text-muted-foreground">+12% from last month</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Average Score</CardTitle>
+                  <BarChart3 className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">87.5%</div>
+                  <p className="text-xs text-muted-foreground">+5.2% from last month</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Active Sessions</CardTitle>
+                  <Activity className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">156</div>
+                  <p className="text-xs text-muted-foreground">+23 from last hour</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">System Load</CardTitle>
+                  <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">24%</div>
+                  <p className="text-xs text-muted-foreground">Optimal performance</p>
+                </CardContent>
+              </Card>
+            </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Performance Metrics</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div>
+                    <div className="flex justify-between text-sm">
+                      <span>Server Response Time</span>
+                      <span>45ms</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
+                      <div className="bg-green-600 h-2 rounded-full" style={{ width: "75%" }}></div>
+                    </div>
+                  </div>
+                  <div>
+                    <div className="flex justify-between text-sm">
+                      <span>Database Performance</span>
+                      <span>92%</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
+                      <div className="bg-blue-600 h-2 rounded-full" style={{ width: "92%" }}></div>
+                    </div>
+                  </div>
+                  <div>
+                    <div className="flex justify-between text-sm">
+                      <span>Memory Usage</span>
+                      <span>68%</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
+                      <div className="bg-yellow-600 h-2 rounded-full" style={{ width: "68%" }}></div>
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>
-
-            {/* Question Management Dialog */}
-            <Dialog open={questionsDialogOpen} onOpenChange={setQuestionsDialogOpen}>
-              <DialogContent className="sm:max-w-[600px]">
-                <DialogHeader>
-                  <DialogTitle>Manage Quiz Questions</DialogTitle>
-                  <DialogDescription>Add or edit questions for this quiz</DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4">
-                  {/* Question List */}
-                  <div className="max-h-[300px] overflow-y-auto border rounded-md">
-                    {quizQuestions.length === 0 ? (
-                      <div className="text-center py-8 text-muted-foreground">
-                        No questions added yet. Add your first question below.
-                      </div>
-                    ) : (
-                      <div className="divide-y">
-                        {quizQuestions.map((q: Question, idx: number) => (
-                          <div key={q._id || idx} className="p-3 hover:bg-gray-50">
-                            <div className="flex justify-between items-start">
-                              <div>
-                                <p className="font-medium">{q.question}</p>
-                                <div className="mt-1 text-sm text-gray-600">
-                                  {q.options.map((opt: string, i: number) => (
-                                    <span key={i} className={i === q.correct ? "text-green-600 font-medium" : ""}>
-                                      {i + 1}. {opt}{i === q.correct ? " ✓" : ""}{i < q.options.length - 1 ? ", " : ""}
-                                    </span>
-                                  ))}
-                                </div>
-                              </div>
-                              <Button variant="ghost" size="sm" onClick={() => handleDeleteQuestion(q._id || idx)}>
-                                <Trash2 className="w-4 h-4 text-red-500" />
-                              </Button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Add Question Form */}
-                  <form onSubmit={handleAddQuestion} className="space-y-4 border-t pt-4">
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Question</label>
-                      <Input 
-                        placeholder="What is the capital of France?" 
-                        value={newQuestion.question} 
-                        onChange={(e) => setNewQuestion({...newQuestion, question: e.target.value})} 
-                        required 
-                      />
-                    </div>
-                    {newQuestion.options.map((opt: string, idx: number) => (
-                      <div key={idx} className="flex items-center gap-2">
-                        <input
-                          type="radio"
-                          name="correct"
-                          checked={newQuestion.correct === idx}
-                          onChange={() => setNewQuestion({...newQuestion, correct: idx})}
-                          className="accent-blue-600"
-                          required
-                        />
-                        <Input
-                          placeholder={`Option ${idx + 1}`}
-                          value={opt}
-                          onChange={(e) => {
-                            const updatedOptions = [...newQuestion.options];
-                            updatedOptions[idx] = e.target.value;
-                            setNewQuestion({...newQuestion, options: updatedOptions});
-                          }}
-                          required
-                        />
-                        {newQuestion.options.length > 2 && (
-                          <Button 
-                            type="button" 
-                            variant="destructive" 
-                            size="sm" 
-                            onClick={() => {
-                              const updatedOptions = newQuestion.options.filter((_, i) => i !== idx);
-                              const updatedCorrect = newQuestion.correct === idx ? 0 : 
-                                                    newQuestion.correct > idx ? newQuestion.correct - 1 : newQuestion.correct;
-                              setNewQuestion({...newQuestion, options: updatedOptions, correct: updatedCorrect});
-                            }}
-                          >
-                            Remove
-                          </Button>
-                        )}
-                        <span className="text-xs text-muted-foreground">Correct</span>
-                      </div>
-                    ))}
-                    <div className="flex gap-2">
-                      <Button 
-                        type="button" 
-                        variant="outline" 
-                        onClick={() => setNewQuestion({...newQuestion, options: [...newQuestion.options, ""]})}
-                      >
-                        Add Option
-                      </Button>
-                    </div>
-                    <div className="flex justify-between pt-2">
-                      <Button type="button" variant="outline" onClick={() => setQuestionsDialogOpen(false)}>
-                        Done
-                      </Button>
-                      <Button type="submit" disabled={questionSubmitting}>
-                        {questionSubmitting ? "Adding..." : "Add Question"}
-                      </Button>
-                    </div>
-                  </form>
-                  {questionError && <div className="text-red-600 text-sm mt-2">{questionError}</div>}
-                </div>
-              </DialogContent>
-            </Dialog>
           </TabsContent>
         </Tabs>
-      </div>
+      </main>
+
+      {/* Questions Dialog */}
+      <Dialog open={questionsDialogOpen} onOpenChange={setQuestionsDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Manage Quiz Questions</DialogTitle>
+            <DialogDescription>
+              Add, edit, or remove questions for this quiz
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-6">
+            {/* Add New Question Form */}
+            <form onSubmit={handleAddQuestion} className="space-y-4 p-4 border rounded-lg">
+              <h3 className="font-medium">Add New Question</h3>
+              <div>
+                <label className="text-sm font-medium">Question</label>
+                <Textarea
+                  placeholder="Enter the question..."
+                  value={newQuestion.question}
+                  onChange={(e) => setNewQuestion({ ...newQuestion, question: e.target.value })}
+                />
+              </div>
+              
+              <div className="grid gap-4 md:grid-cols-2">
+                {newQuestion.options.map((option, index) => (
+                  <div key={index}>
+                    <label className="text-sm font-medium">Option {index + 1}</label>
+                    <Input
+                      placeholder={`Option ${index + 1}`}
+                      value={option}
+                      onChange={(e) => {
+                        const newOptions = [...newQuestion.options];
+                        newOptions[index] = e.target.value;
+                        setNewQuestion({ ...newQuestion, options: newOptions });
+                      }}
+                    />
+                  </div>
+                ))}
+              </div>
+              
+              <div>
+                <label className="text-sm font-medium">Correct Answer</label>
+                <select
+                  value={newQuestion.correct}
+                  onChange={(e) => setNewQuestion({ ...newQuestion, correct: parseInt(e.target.value) })}
+                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                >
+                  {newQuestion.options.map((option, index) => (
+                    <option key={index} value={index}>
+                      Option {index + 1}: {option || "Enter option"}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              
+              {questionError && (
+                <div className="text-red-600 text-sm">{questionError}</div>
+              )}
+              
+              <Button type="submit" disabled={questionSubmitting}>
+                {questionSubmitting ? "Adding..." : "Add Question"}
+              </Button>
+            </form>
+
+            {/* Existing Questions */}
+            <div>
+              <h3 className="font-medium mb-4">Existing Questions ({quizQuestions.length})</h3>
+              <div className="space-y-4">
+                {quizQuestions.map((question, index) => (
+                  <div key={question._id || index} className="p-4 border rounded-lg">
+                    <div className="flex justify-between items-start mb-2">
+                      <h4 className="font-medium">Question {index + 1}</h4>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDeleteQuestion(question._id)}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                    <p className="text-sm mb-3">{question.question}</p>
+                    <div className="space-y-1">
+                      {question.options.map((option, optIndex) => (
+                        <div
+                          key={optIndex}
+                          className={`text-sm p-2 rounded ${
+                            optIndex === question.correct
+                              ? "bg-green-100 text-green-800"
+                              : "bg-gray-100"
+                          }`}
+                        >
+                          {optIndex + 1}. {option}
+                          {optIndex === question.correct && (
+                            <span className="ml-2 text-xs">✓ Correct</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
-  )
+  );
 }
