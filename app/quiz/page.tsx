@@ -70,23 +70,18 @@ export default function QuizPage() {
     console.log("Fetched quizzes:", upcomingQuizzes);
   }, [upcomingQuizzes]);
 
-  // Filter and sort quizzes by date/time
-  const now = new Date();
+  // Remove upcoming/past split, just show all quizzes
   const quizzesWithDate = upcomingQuizzes.map((quiz) => {
     let quizDateTime: Date | null = null;
     if (quiz.date && quiz.time) {
-      // Parse as UTC to avoid timezone issues
-      // Accepts 'YYYY-MM-DD' and 'HH:mm' (24-hour)
       const dateTimeString = `${quiz.date}T${quiz.time}:00Z`;
       const parsed = new Date(dateTimeString);
       if (!isNaN(parsed.getTime())) {
         quizDateTime = parsed;
       } else {
-        // fallback: try local time (less reliable)
         quizDateTime = new Date(`${quiz.date}T${quiz.time}`);
       }
     } else if (quiz.date) {
-      // If only date, treat as start of day UTC
       const parsed = new Date(`${quiz.date}T00:00:00Z`);
       if (!isNaN(parsed.getTime())) {
         quizDateTime = parsed;
@@ -96,12 +91,6 @@ export default function QuizPage() {
     }
     return { ...quiz, quizDateTime };
   });
-  const futureQuizzes = quizzesWithDate
-    .filter((quiz) => quiz.quizDateTime && quiz.quizDateTime > now)
-    .sort((a, b) => (a.quizDateTime as Date).getTime() - (b.quizDateTime as Date).getTime());
-  const pastQuizzes = quizzesWithDate
-    .filter((quiz) => quiz.quizDateTime && quiz.quizDateTime <= now)
-    .sort((a, b) => (b.quizDateTime as Date).getTime() - (a.quizDateTime as Date).getTime());
 
   const quickStats = [
     { label: "Total Participants", value: "2,450", icon: Users, color: "text-blue-600" },
@@ -155,210 +144,63 @@ export default function QuizPage() {
           ))}
         </div>
 
-        {/* Main Content */}
-        <Tabs defaultValue="upcoming" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="upcoming">Upcoming Quizzes</TabsTrigger>
-            <TabsTrigger value="leaderboard">Leaderboard</TabsTrigger>
-            <TabsTrigger value="performance">Performance</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="upcoming" className="space-y-6">
-            {loading ? (
-              <div className="text-center py-12">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-                <p className="mt-4 text-gray-600">Loading quizzes...</p>
-              </div>
-            ) : (
-              <>
-                {/* Upcoming Quizzes */}
-                <h2 className="text-2xl font-bold mb-2">Upcoming Quizzes</h2>
-                {futureQuizzes.length > 0 ? (
-                  <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-8">
-                    {futureQuizzes.map((quiz, index) => (
-                      <Card key={index} className="hover:shadow-lg transition-shadow">
-                        <CardHeader>
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <CardTitle className="text-lg">{quiz.title}</CardTitle>
-                              <CardDescription className="mt-2">
-                                <div className="flex items-center gap-2 text-sm text-gray-600">
-                                  <Calendar className="w-4 h-4" />
-                                  {quiz.date} at {quiz.time}
-                                </div>
-                              </CardDescription>
-                            </div>
-                            <Badge variant={quiz.difficulty === "Easy" ? "default" : quiz.difficulty === "Intermediate" ? "secondary" : "destructive"}>
-                              {quiz.difficulty}
-                            </Badge>
+        {/* All Quizzes Section */}
+        <div className="space-y-6">
+          <h2 className="text-2xl font-bold mb-2">Participate in Quizzes</h2>
+          {loading ? (
+            <div className="text-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+              <p className="mt-4 text-gray-600">Loading quizzes...</p>
+            </div>
+          ) : quizzesWithDate.length > 0 ? (
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-8">
+              {quizzesWithDate.map((quiz, index) => (
+                <Card key={index} className="hover:shadow-lg transition-shadow">
+                  <CardHeader>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <CardTitle className="text-lg">{quiz.title}</CardTitle>
+                        <CardDescription className="mt-2">
+                          <div className="flex items-center gap-2 text-sm text-gray-600">
+                            <Calendar className="w-4 h-4" />
+                            {quiz.date} at {quiz.time}
                           </div>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                          <div className="flex justify-between text-sm">
-                            <span className="text-gray-600">Participants</span>
-                            <span className="font-medium">{quiz.participants || 0}</span>
-                          </div>
-                          <div className="flex justify-between text-sm">
-                            <span className="text-gray-600">Prize</span>
-                            <span className="font-medium">{quiz.prize || "Certificate"}</span>
-                          </div>
-                          <Button className="w-full" asChild>
-                            <Link href={`/quiz/live`}>
-                              <Play className="w-4 h-4 mr-2" />
-                              Join Quiz
-                            </Link>
-                          </Button>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                ) : (
-                  <Card className="text-center py-12 mb-8">
-                    <CardContent>
-                      <Brain className="w-16 h-16 mx-auto mb-4 text-gray-400" />
-                      <h3 className="text-xl font-semibold mb-2">No upcoming quizzes</h3>
-                      <p className="text-gray-600 mb-4">Check back later for new quiz challenges!</p>
-                    </CardContent>
-                  </Card>
-                )}
-                {/* Past Quizzes */}
-                <h2 className="text-2xl font-bold mb-2">Past Quizzes</h2>
-                {pastQuizzes.length > 0 ? (
-                  <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                    {pastQuizzes.map((quiz, index) => (
-                      <div key={index} className="relative">
-                        <Card
-                          className="opacity-60 cursor-pointer hover:opacity-80 transition pointer-events-auto"
-                          onClick={() => handleOpenPastQuizSummary(quiz)}
-                        >
-                          <CardHeader>
-                            <div className="flex justify-between items-start">
-                              <div>
-                                <CardTitle className="text-lg flex items-center gap-2">
-                                  <Lock className="w-5 h-5 text-gray-400" />
-                                  {quiz.title}
-                                </CardTitle>
-                                <CardDescription className="mt-2">
-                                  <div className="flex items-center gap-2 text-sm text-gray-600">
-                                    <Calendar className="w-4 h-4" />
-                                    {quiz.date} at {quiz.time}
-                                  </div>
-                                </CardDescription>
-                              </div>
-                              <Badge variant="outline" className="flex items-center gap-1"><Lock className="w-3 h-3" /> Locked</Badge>
-                            </div>
-                          </CardHeader>
-                          <CardContent className="space-y-4">
-                            <div className="flex justify-between text-sm">
-                              <span className="text-gray-600">Participants</span>
-                              <span className="font-medium">{quiz.participants || 0}</span>
-                            </div>
-                            <div className="flex justify-between text-sm">
-                              <span className="text-gray-600">Prize</span>
-                              <span className="font-medium">{quiz.prize || "Certificate"}</span>
-                            </div>
-                          </CardContent>
-                          <div className="absolute inset-0 bg-gray-200 opacity-40 rounded-lg pointer-events-none" />
-                        </Card>
+                        </CardDescription>
                       </div>
-                    ))}
-                  </div>
-                ) : (
-                  <Card className="text-center py-12">
-                    <CardContent>
-                      <BookOpen className="w-16 h-16 mx-auto mb-4 text-gray-400" />
-                      <h3 className="text-xl font-semibold mb-2">No past quizzes</h3>
-                      <p className="text-gray-600 mb-4">You haven't missed any quizzes yet!</p>
-                    </CardContent>
-                  </Card>
-                )}
-              </>
-            )}
-          </TabsContent>
-
-          <TabsContent value="leaderboard" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Top Performers</CardTitle>
-                <CardDescription>This week's leaderboard</CardDescription>
-              </CardHeader>
+                      <Badge variant={quiz.difficulty === "Easy" ? "default" : quiz.difficulty === "Intermediate" ? "secondary" : "destructive"}>
+                        {quiz.difficulty}
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">Participants</span>
+                      <span className="font-medium">{quiz.participants || 0}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">Prize</span>
+                      <span className="font-medium">{quiz.prize || "Certificate"}</span>
+                    </div>
+                    <Button className="w-full" asChild>
+                      <Link href={`/quiz/live`}>
+                        <Play className="w-4 h-4 mr-2" />
+                        Participate
+                      </Link>
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <Card className="text-center py-12 mb-8">
               <CardContent>
-                <LeaderboardChart />
+                <Brain className="w-16 h-16 mx-auto mb-4 text-gray-400" />
+                <h3 className="text-xl font-semibold mb-2">No quizzes available</h3>
+                <p className="text-gray-600 mb-4">Check back later for new quiz challenges!</p>
               </CardContent>
             </Card>
-          </TabsContent>
-
-          <TabsContent value="performance" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Your Performance</CardTitle>
-                <CardDescription>Track your quiz performance over time</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <PerformanceChart />
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
-
-            {/* Past Quiz Summary Modal */}
-            <Dialog open={summaryOpen} onOpenChange={handleCloseSummary}>
-              <DialogContent className="max-w-2xl">
-                <DialogHeader>
-                  <DialogTitle>Quiz Summary</DialogTitle>
-                  <DialogDescription>
-                    {selectedPastQuiz ? (
-                      <span>
-                        {selectedPastQuiz.title} <br />
-                        {selectedPastQuiz.date} at {selectedPastQuiz.time}
-                      </span>
-                    ) : null}
-                  </DialogDescription>
-                </DialogHeader>
-                {summaryLoading ? (
-                  <div className="text-center py-8">Loading...</div>
-                ) : quizSummary ? (
-                  <div className="space-y-4">
-                    {/* Debug: Show raw quizSummary object */}
-                    <pre className="bg-gray-100 p-2 rounded text-xs overflow-x-auto mb-2">{JSON.stringify(quizSummary, null, 2)}</pre>
-                    <div className="flex flex-wrap gap-4 text-sm">
-                      <span><strong>Participants:</strong> {quizSummary.participants || 0}</span>
-                      <span><strong>Prize:</strong> {quizSummary.prize || "Certificate"}</span>
-                      {/* Add more stats as needed */}
-                    </div>
-                    <div>
-                      <h4 className="font-semibold mb-2">Questions & Answers</h4>
-                      <div className="space-y-3">
-                        {quizSummary.questions && quizSummary.questions.length > 0 ? (
-                          quizSummary.questions.map((q: any, idx: number) => (
-                            <div key={q._id || idx} className="p-3 border rounded">
-                              <div className="font-medium mb-1">Q{idx + 1}: {q.text}</div>
-                              <ul className="ml-4 list-disc">
-                                {q.options.map((opt: string, oidx: number) => (
-                                  <li key={oidx} className={oidx === q.answer ? "text-green-700 font-semibold" : ""}>
-                                    {opt} {oidx === q.answer && <span className="ml-2 text-xs">✓ Correct</span>}
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                          ))
-                        ) : (
-                          <div>No questions found.</div>
-                        )}
-                      </div>
-                    </div>
-                    {/* User's own score (if available) */}
-                    {quizSummary.userScore !== undefined && (
-                      <div className="mt-4 p-3 bg-blue-50 rounded text-blue-800 font-semibold">
-                        Your Score: {quizSummary.userScore}
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="text-center py-8 text-red-600">Failed to load quiz summary.</div>
-                )}
-              </DialogContent>
-            </Dialog>
+          )}
+        </div>
       </div>
     </div>
   );
