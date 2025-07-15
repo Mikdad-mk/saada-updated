@@ -72,10 +72,10 @@ export default function AboutPage() {
       image: "/placeholder.svg?height=200&width=200",
     },
     {
-      name: "Fatima Hassan",
-      position: "Vice President",
-      description: "Coordinating activities and ensuring smooth operations across all wings.",
-      image: "/placeholder.svg?height=200&width=200",
+      name: "Adheeb",
+      position: "Working Vice President",
+      description: "Supporting the president and coordinating union activities with dedication.",
+      image: "/adheeb.png",
     },
     {
       name: "Omar Khalil",
@@ -84,10 +84,10 @@ export default function AboutPage() {
       image: "/placeholder.svg?height=200&width=200",
     },
     {
-      name: "Aisha Rahman",
+      name: "Shafin",
       position: "Treasurer",
       description: "Overseeing financial management and budget allocation for activities.",
-      image: "/placeholder.svg?height=200&width=200",
+      image: "/shafin.png",
     },
   ];
 
