@@ -66,6 +66,12 @@ export default function Navbar() {
               About
             </Link>
             <Link
+              href="/gallery"
+              className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
+            >
+              Gallery (1,2,3,4,5)
+            </Link>
+            <Link
               href="/class-unions"
               className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
             >
@@ -191,6 +197,13 @@ export default function Navbar() {
               onClick={() => setIsOpen(false)}
             >
               About
+            </Link>
+            <Link
+              href="/gallery"
+              className="text-gray-700 hover:text-blue-600 block px-3 py-2 rounded-md text-base font-medium transition-colors"
+              onClick={() => setIsOpen(false)}
+            >
+              Gallery (1,2,3,4,5)
             </Link>
             <Link
               href="/class-unions"
