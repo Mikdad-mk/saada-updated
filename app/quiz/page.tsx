@@ -75,9 +75,24 @@ export default function QuizPage() {
   const quizzesWithDate = upcomingQuizzes.map((quiz) => {
     let quizDateTime: Date | null = null;
     if (quiz.date && quiz.time) {
-      quizDateTime = new Date(`${quiz.date}T${quiz.time}`);
+      // Parse as UTC to avoid timezone issues
+      // Accepts 'YYYY-MM-DD' and 'HH:mm' (24-hour)
+      const dateTimeString = `${quiz.date}T${quiz.time}:00Z`;
+      const parsed = new Date(dateTimeString);
+      if (!isNaN(parsed.getTime())) {
+        quizDateTime = parsed;
+      } else {
+        // fallback: try local time (less reliable)
+        quizDateTime = new Date(`${quiz.date}T${quiz.time}`);
+      }
     } else if (quiz.date) {
-      quizDateTime = new Date(quiz.date);
+      // If only date, treat as start of day UTC
+      const parsed = new Date(`${quiz.date}T00:00:00Z`);
+      if (!isNaN(parsed.getTime())) {
+        quizDateTime = parsed;
+      } else {
+        quizDateTime = null;
+      }
     }
     return { ...quiz, quizDateTime };
   });
