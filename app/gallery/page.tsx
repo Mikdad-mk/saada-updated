@@ -3,13 +3,12 @@
 import Image from "next/image";
 
 const images = [
-  "/about.png",
-  "/adheeb.png",
-  "/shafin.png",
-  "/anshid 1st.png",
-  "/anshid d2.png",
-  "/anshif.png",
-  "/faseeh.png",
+  "/1.png",
+  "/2.png",
+  "/3.png",
+  "/4.png",
+  "/5.png",
+  "/6.png",
 ];
 
 export default function GalleryPage() {
