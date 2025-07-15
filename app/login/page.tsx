@@ -3,12 +3,6 @@ import { signIn } from "next-auth/react";
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
-import { UserRole } from "@/app/api/auth/[...nextauth]/route";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -19,7 +13,6 @@ export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // Get error from URL params (for redirects from protected routes)
   const urlError = searchParams.get("error");
   const callbackUrl = searchParams.get("callbackUrl") || "/";
 
@@ -39,10 +32,7 @@ export default function LoginPage() {
       if (res?.error) {
         setError(res.error);
       } else if (res?.ok) {
-        // Role-based redirects
-        const userRole = res.url?.includes("admin") ? "admin" : "user";
-        
-        if (userRole === "admin" || email.toLowerCase() === "admin@saada.com") {
+        if (email.toLowerCase() === "admin@saada.com") {
           router.push("/admin");
         } else {
           router.push(callbackUrl);
@@ -55,7 +45,7 @@ export default function LoginPage() {
     }
   }
 
-  const handleDemoLogin = async (role: UserRole) => {
+  const handleDemoLogin = async (role: string) => {
     setLoading(true);
     setError("");
 
@@ -63,15 +53,15 @@ export default function LoginPage() {
     let demoPassword = "";
 
     switch (role) {
-      case UserRole.ADMIN:
+      case "admin":
         demoEmail = "admin@saada.com";
         demoPassword = "Admin123!";
         break;
-      case UserRole.MODERATOR:
+      case "moderator":
         demoEmail = "moderator@saada.com";
         demoPassword = "Moderator123!";
         break;
-      case UserRole.USER:
+      case "user":
         demoEmail = "user@saada.com";
         demoPassword = "User123!";
         break;
@@ -90,7 +80,7 @@ export default function LoginPage() {
       if (res?.error) {
         setError(res.error);
       } else if (res?.ok) {
-        if (role === UserRole.ADMIN) {
+        if (role === "admin") {
           router.push("/admin");
         } else {
           router.push("/");
@@ -105,34 +95,30 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 px-4 sm:px-6 lg:px-8">
-      <Card className="w-full max-w-md shadow-xl border-0">
-        <CardHeader className="text-center space-y-4">
+      <div className="w-full max-w-md bg-white rounded-lg shadow-xl border-0 p-6">
+        <div className="text-center space-y-4 mb-6">
           <div className="mx-auto w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center">
             <span className="text-white text-2xl font-bold">S</span>
           </div>
           <div>
-            <CardTitle className="text-2xl font-bold text-gray-900">Welcome Back</CardTitle>
+            <h1 className="text-2xl font-bold text-gray-900">Welcome Back</h1>
             <p className="text-gray-600 mt-2">Sign in to your SA'ADA Union account</p>
           </div>
-        </CardHeader>
+        </div>
 
         <form onSubmit={handleSubmit}>
-          <CardContent className="space-y-4">
-            {/* Error Display */}
+          <div className="space-y-4">
             {(error || urlError) && (
-              <Alert variant="destructive">
-                <AlertDescription>
-                  {error || urlError}
-                </AlertDescription>
-              </Alert>
+              <div className="p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+                {error || urlError}
+              </div>
             )}
 
-            {/* Email Input */}
             <div className="space-y-2">
               <label htmlFor="email" className="text-sm font-medium text-gray-700">
                 Email Address
               </label>
-              <Input
+              <input
                 id="email"
                 type="email"
                 placeholder="Enter your email"
@@ -140,17 +126,16 @@ export default function LoginPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 disabled={loading}
-                className="h-11"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 h-11"
               />
             </div>
 
-            {/* Password Input */}
             <div className="space-y-2">
               <label htmlFor="password" className="text-sm font-medium text-gray-700">
                 Password
               </label>
               <div className="relative">
-                <Input
+                <input
                   id="password"
                   type={showPassword ? "text" : "password"}
                   placeholder="Enter your password"
@@ -158,7 +143,7 @@ export default function LoginPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   disabled={loading}
-                  className="h-11 pr-10"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 h-11 pr-10"
                 />
                 <button
                   type="button"
@@ -166,64 +151,50 @@ export default function LoginPage() {
                   className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
                   disabled={loading}
                 >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  {showPassword ? "Hide" : "Show"}
                 </button>
               </div>
             </div>
 
-            {/* Demo Login Buttons */}
             <div className="space-y-2">
               <p className="text-xs text-gray-500 text-center">Quick Demo Access:</p>
               <div className="grid grid-cols-3 gap-2">
-                <Button
+                <button
                   type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleDemoLogin(UserRole.ADMIN)}
+                  onClick={() => handleDemoLogin("admin")}
                   disabled={loading}
-                  className="text-xs"
+                  className="px-3 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50"
                 >
                   Admin
-                </Button>
-                <Button
+                </button>
+                <button
                   type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleDemoLogin(UserRole.MODERATOR)}
+                  onClick={() => handleDemoLogin("moderator")}
                   disabled={loading}
-                  className="text-xs"
+                  className="px-3 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50"
                 >
                   Moderator
-                </Button>
-                <Button
+                </button>
+                <button
                   type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleDemoLogin(UserRole.USER)}
+                  onClick={() => handleDemoLogin("user")}
                   disabled={loading}
-                  className="text-xs"
+                  className="px-3 py-1 text-xs border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50"
                 >
                   User
-                </Button>
+                </button>
               </div>
             </div>
-          </CardContent>
+          </div>
 
-          <CardFooter className="flex flex-col gap-4">
-            <Button 
+          <div className="mt-6 space-y-4">
+            <button 
               type="submit" 
-              className="w-full h-11 bg-blue-600 hover:bg-blue-700" 
+              className="w-full h-11 bg-blue-600 hover:bg-blue-700 text-white rounded-md disabled:opacity-50" 
               disabled={loading}
             >
-              {loading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Signing in...
-                </>
-              ) : (
-                "Sign In"
-              )}
-            </Button>
+              {loading ? "Signing in..." : "Sign In"}
+            </button>
 
             <div className="text-center text-sm text-gray-600">
               Don't have an account?{" "}
@@ -243,9 +214,9 @@ export default function LoginPage() {
                 Forgot your password?
               </Link>
             </div>
-          </CardFooter>
+          </div>
         </form>
-      </Card>
+      </div>
     </div>
   );
 } 

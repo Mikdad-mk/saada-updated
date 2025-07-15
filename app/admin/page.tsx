@@ -44,6 +44,11 @@ import {
 import { useAuth } from "@/hooks/useAuth";
 import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
+import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { arrayMove, SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { GripVertical } from 'lucide-react';
+import { useToast } from '@/components/ui/use-toast';
 
 type Quiz = {
   _id: any;
@@ -62,43 +67,37 @@ type Question = {
   correct: number;
 };
 
+// Add this helper for sortable items
+function SortableItem({ id, children, ...props }: any) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.5 : 1,
+        background: isDragging ? '#f3f4f6' : undefined,
+      }}
+      {...attributes}
+      {...props}
+    >
+      <span {...listeners} style={{ cursor: 'grab', marginRight: 8, display: 'inline-block' }}>
+        <GripVertical className="inline w-4 h-4 text-gray-400" />
+      </span>
+      {children}
+    </div>
+  );
+}
+
 export default function AdminPage() {
+  // All hooks at the top!
   const { user, isAuthenticated, isAdmin, canAccessAdmin, status } = useAuth();
   const router = useRouter();
+  const { toast } = useToast();
+  // Add this for dnd-kit sensors
+  const sensors = useSensors(useSensor(PointerSensor));
 
-  // Redirect if not authenticated or not admin
-  useEffect(() => {
-    if (status === "loading") return;
-    
-    if (!isAuthenticated) {
-      router.push("/login?callbackUrl=/admin");
-      return;
-    }
-    
-    if (!canAccessAdmin()) {
-      router.push("/unauthorized");
-      return;
-    }
-  }, [isAuthenticated, canAccessAdmin, status, router]);
-
-  // Show loading state
-  if (status === "loading") {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading admin panel...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Don't render if not authenticated or not admin
-  if (!isAuthenticated || !canAccessAdmin()) {
-    return null;
-  }
-
-  // All hooks at the top!
   const [activeTab, setActiveTab] = useState("dashboard");
   const [liveQuiz, setLiveQuiz] = useState({ question: "", options: ["", ""], correct: 0 });
   const [liveQuizLoading, setLiveQuizLoading] = useState(false);
@@ -107,7 +106,7 @@ export default function AdminPage() {
   
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [quizLoading, setQuizLoading] = useState(true);
-  const [newQuiz, setNewQuiz] = useState({ title: "", difficulty: "", date: "", time: "", prize: "" });
+  const [newQuiz, setNewQuiz] = useState({ title: "", difficulty: "Easy", date: "", time: "", prize: "" });
   const [quizSubmitting, setQuizSubmitting] = useState(false);
   const [quizSubmitError, setQuizSubmitError] = useState("");
 
@@ -118,9 +117,14 @@ export default function AdminPage() {
   const [questionSubmitting, setQuestionSubmitting] = useState(false);
   const [questionError, setQuestionError] = useState("");
 
+  // Add state for live quiz update feedback
+  const [liveQuizUpdateLoading, setLiveQuizUpdateLoading] = useState(false);
+  const [liveQuizUpdateError, setLiveQuizUpdateError] = useState("");
+  const [liveQuizUpdateSuccess, setLiveQuizUpdateSuccess] = useState("");
+
   useEffect(() => {
     async function fetchLiveQuiz() {
-      const res = await fetch("/api/live-quiz");
+      const res = await fetch("/api/current-quiz");
       const data = await res.json();
       if (data && data.question && data.options) {
         setLiveQuiz({ question: data.question, options: data.options, correct: data.correct ?? 0 });
@@ -146,6 +150,13 @@ export default function AdminPage() {
     fetchQuizzes();
   }, []);
 
+  // Debug log for quizzes array
+  useEffect(() => {
+    if (quizzes.length) {
+      console.log("Loaded quizzes:", quizzes);
+    }
+  }, [quizzes]);
+
   const handleSignOut = async () => {
     await signOut({ callbackUrl: "/" });
   };
@@ -167,7 +178,7 @@ export default function AdminPage() {
       setLiveQuizLoading(false);
       return;
     }
-    const res = await fetch("/api/live-quiz", {
+    const res = await fetch("/api/current-quiz", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(liveQuiz),
@@ -180,7 +191,28 @@ export default function AdminPage() {
     e.preventDefault();
     setQuizSubmitting(true);
     setQuizSubmitError("");
-    
+
+    // Robust validation for required fields
+    if (!newQuiz.title.trim()) {
+      setQuizSubmitError("Quiz title is required.");
+      setQuizSubmitting(false);
+      return;
+    }
+    if (!newQuiz.difficulty.trim()) {
+      setQuizSubmitError("Quiz difficulty is required.");
+      setQuizSubmitting(false);
+      return;
+    }
+    if (!newQuiz.date.trim()) {
+      setQuizSubmitError("Quiz date is required.");
+      setQuizSubmitting(false);
+      return;
+    }
+    if (!newQuiz.time.trim()) {
+      setQuizSubmitError("Quiz time is required.");
+      setQuizSubmitting(false);
+      return;
+    }
     try {
       const res = await fetch("/api/quiz", {
         method: "POST",
@@ -235,15 +267,34 @@ export default function AdminPage() {
     e.preventDefault();
     setQuestionError("");
     setQuestionSubmitting(true);
-    // Validation: all options non-empty, correct index valid
+    // Robust validation
+    if (!currentQuizId || typeof currentQuizId !== "string" || !currentQuizId.trim()) {
+      setQuestionError("No quiz selected. Please select a quiz before adding questions.");
+      setQuestionSubmitting(false);
+      return;
+    }
+    if (!newQuestion.question.trim()) {
+      setQuestionError("Question text cannot be empty.");
+      setQuestionSubmitting(false);
+      return;
+    }
+    if (!Array.isArray(newQuestion.options) || newQuestion.options.length < 2) {
+      setQuestionError("Please provide at least two options.");
+      setQuestionSubmitting(false);
+      return;
+    }
+    if (newQuestion.options.some(opt => !opt.trim())) {
+      setQuestionError("All options must be non-empty.");
+      setQuestionSubmitting(false);
+      return;
+    }
     if (
-      !newQuestion.question.trim() ||
-      newQuestion.options.some(opt => !opt.trim()) ||
+      typeof newQuestion.correct !== "number" ||
       newQuestion.correct < 0 ||
       newQuestion.correct >= newQuestion.options.length ||
       !newQuestion.options[newQuestion.correct].trim()
     ) {
-      setQuestionError("Please fill in the question, all options, and select a valid correct answer.");
+      setQuestionError("Please select a valid correct answer.");
       setQuestionSubmitting(false);
       return;
     }
@@ -255,21 +306,26 @@ export default function AdminPage() {
         answer: newQuestion.correct,
         quizId: currentQuizId
       };
+      // Log the data being sent for debugging
+      console.log("Submitting question data:", questionData);
       const res = await fetch("/api/quiz/questions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(questionData),
       });
+      // Log the response for debugging
+      const resJson = await res.json();
+      console.log("/api/quiz/questions response:", res.status, resJson);
       if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.error || "Failed to add question");
+        setQuestionError(resJson.error || "Failed to add question");
+        setQuestionSubmitting(false);
+        return;
       }
-      const data = await res.json();
       // Update local state with frontend type
       setQuizQuestions(prevQuestions => [
         ...prevQuestions,
         {
-          _id: data.id,
+          _id: resJson.id,
           question: newQuestion.question,
           options: newQuestion.options,
           correct: newQuestion.correct
@@ -278,13 +334,14 @@ export default function AdminPage() {
       setNewQuestion({ question: "", options: ["", ""], correct: 0 });
     } catch (error: any) {
       console.error("Error adding question:", error);
-      alert("Failed to add question: " + error.message);
+      setQuestionError(error.message || "Failed to add question");
     } finally {
       setQuestionSubmitting(false);
     }
   }
 
   async function handleDeleteQuestion(questionId: string) {
+    if (!questionId) return;
     if (!confirm("Are you sure you want to delete this question?")) return;
     
     try {
@@ -323,6 +380,159 @@ export default function AdminPage() {
       console.error("Error deleting quiz:", error);
       alert("Failed to delete quiz: " + error.message);
     }
+  }
+
+  // Function to set a quiz as live
+  async function handleSetQuizAsLive(quizId: string) {
+    setLiveQuizUpdateLoading(true);
+    setLiveQuizUpdateError("");
+    setLiveQuizUpdateSuccess("");
+    try {
+      // Extra logging for quizId
+      console.log("handleSetQuizAsLive called with quizId:", quizId);
+      if (!quizId || typeof quizId !== "string" || !quizId.trim()) {
+        setLiveQuizUpdateError("Quiz ID is missing or invalid. Cannot set quiz as live.");
+        setLiveQuizUpdateLoading(false);
+        return;
+      }
+      // Find the quiz and its questions
+      const quiz = quizzes.find(q => q._id === quizId);
+      if (!quiz) throw new Error("Quiz not found");
+      // Fetch questions for this quiz
+      const res = await fetch(`/api/quiz/questions?quizId=${quizId}`);
+      if (!res.ok) throw new Error("Failed to fetch questions for quiz");
+      const questionsRaw = await res.json();
+      // Convert to backend format
+      const questions = questionsRaw.map((q: any) => ({
+        text: q.text || q.question,
+        options: q.options,
+        answer: typeof q.answer === "number" ? q.answer : q.correct
+      }));
+      // Robust validation
+      if (!questions.length) {
+        setLiveQuizUpdateError("Quiz must have at least one question to be set as live.");
+        setLiveQuizUpdateLoading(false);
+        return;
+      }
+      for (let i = 0; i < questions.length; i++) {
+        const q = questions[i];
+        if (!q.text || !Array.isArray(q.options) || q.options.length < 2) {
+          setLiveQuizUpdateError(`Question ${i + 1} is missing text or has less than 2 options.`);
+          setLiveQuizUpdateLoading(false);
+          return;
+        }
+        if (typeof q.answer !== "number" || q.answer < 0 || q.answer >= q.options.length) {
+          setLiveQuizUpdateError(`Question ${i + 1} has an invalid correct answer index.`);
+          setLiveQuizUpdateLoading(false);
+          return;
+        }
+        if (!q.options[q.answer] || !q.options[q.answer].trim()) {
+          setLiveQuizUpdateError(`Question ${i + 1} has an empty correct answer option.`);
+          setLiveQuizUpdateLoading(false);
+          return;
+        }
+      }
+      // Log the payload for debugging
+      console.log("Setting quiz as live. Payload:", { quizId, questions });
+      // Send POST to /api/live-quiz
+      const postRes = await fetch("/api/current-quiz", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ quizId, questions }),
+      });
+      // Log the response for debugging
+      const postResJson = await postRes.json();
+      console.log("/api/current-quiz response:", postRes.status, postResJson);
+      if (!postRes.ok) {
+        setLiveQuizUpdateError(postResJson.error || "Failed to set live quiz");
+        setLiveQuizUpdateLoading(false);
+        return;
+      }
+      setLiveQuizUpdateSuccess("Live quiz set successfully!");
+    } catch (error: any) {
+      setLiveQuizUpdateError(error.message || "Failed to set live quiz");
+    } finally {
+      setLiveQuizUpdateLoading(false);
+    }
+  }
+
+  // Add option for dynamic add/remove in newQuestion
+  function handleAddOption() {
+    setNewQuestion((q) => ({ ...q, options: [...q.options, ''] }));
+  }
+  function handleRemoveOption(idx: number) {
+    if (newQuestion.options.length <= 2) return;
+    setNewQuestion((q) => {
+      const options = q.options.filter((_, i) => i !== idx);
+      let correct = q.correct;
+      if (correct >= options.length) correct = 0;
+      return { ...q, options, correct };
+    });
+  }
+  function handleOptionDragEnd(event: any) {
+    const { active, over } = event;
+    if (active.id !== over.id) {
+      setNewQuestion((q) => {
+        const oldIndex = q.options.findIndex((_, i) => i === Number(active.id));
+        const newIndex = q.options.findIndex((_, i) => i === Number(over.id));
+        const options = arrayMove(q.options, oldIndex, newIndex);
+        let correct = q.correct;
+        if (oldIndex === correct) correct = newIndex;
+        else if (oldIndex < correct && newIndex >= correct) correct--;
+        else if (oldIndex > correct && newIndex <= correct) correct++;
+        return { ...q, options, correct };
+      });
+    }
+  }
+  // For questions drag-and-drop
+  function handleQuestionsDragEnd(event: any) {
+    const { active, over } = event;
+    if (active.id !== over.id) {
+      setQuizQuestions((questions) => {
+        const oldIndex = questions.findIndex((q, i) => q._id === active.id);
+        const newIndex = questions.findIndex((q, i) => q._id === over.id);
+        const newQuestions = arrayMove(questions, oldIndex, newIndex);
+        // Persist new order to backend
+        if (currentQuizId) {
+          const questionIds = newQuestions.map(q => q._id);
+          fetch('/api/quiz/questions', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ quizId: currentQuizId, questionIds }),
+          })
+            .then(res => res.json())
+            .then(data => {
+              if (data.success) {
+                toast({ title: 'Questions reordered', description: 'The order has been saved.' });
+              } else {
+                toast({ title: 'Error', description: data.error || 'Failed to save order', variant: 'destructive' });
+              }
+            })
+            .catch(() => {
+              toast({ title: 'Error', description: 'Failed to save order', variant: 'destructive' });
+            });
+        }
+        return newQuestions;
+      });
+    }
+  }
+
+  // Now do conditional rendering
+  // Show loading state
+  if (status === "loading") {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading admin panel...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Don't render if not authenticated or not admin
+  if (!isAuthenticated || !canAccessAdmin()) {
+    return null;
   }
 
   return (
@@ -380,9 +590,9 @@ export default function AdminPage() {
               <BarChart3 className="w-4 h-4" />
               <span>Dashboard</span>
             </TabsTrigger>
-            <TabsTrigger value="live-quiz" className="flex items-center space-x-2">
+            <TabsTrigger value="current-quiz" className="flex items-center space-x-2">
               <Brain className="w-4 h-4" />
-              <span>Live Quiz</span>
+              <span>Current Quiz</span>
             </TabsTrigger>
             <TabsTrigger value="quizzes" className="flex items-center space-x-2">
               <FileText className="w-4 h-4" />
@@ -503,72 +713,18 @@ export default function AdminPage() {
             </div>
           </TabsContent>
 
-          {/* Live Quiz Tab */}
-          <TabsContent value="live-quiz" className="space-y-6">
+          {/* Current Quiz Tab */}
+          <TabsContent value="current-quiz" className="space-y-6">
+            {/* Removed broken Live Quiz form. Use the Set as Current Quiz button in the quizzes table instead. */}
             <Card>
               <CardHeader>
-                <CardTitle>Live Quiz Management</CardTitle>
+                <CardTitle>Current Quiz Management</CardTitle>
                 <CardDescription>
-                  Create and manage live quiz questions for real-time competitions
+                  Use the "Set as Current Quiz" button in the quizzes table to activate a quiz for users.
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <form onSubmit={handleLiveQuizSubmit} className="space-y-4">
-                  <div>
-                    <label className="text-sm font-medium">Question</label>
-                    <Textarea
-                      placeholder="Enter the quiz question..."
-                      value={liveQuiz.question}
-                      onChange={(e) => setLiveQuiz({ ...liveQuiz, question: e.target.value })}
-                      className="mt-1"
-                    />
-                  </div>
-                  
-                  <div className="grid gap-4 md:grid-cols-2">
-                    {liveQuiz.options.map((option, index) => (
-                      <div key={index}>
-                        <label className="text-sm font-medium">Option {index + 1}</label>
-                        <Input
-                          placeholder={`Option ${index + 1}`}
-                          value={option}
-                          onChange={(e) => {
-                            const newOptions = [...liveQuiz.options];
-                            newOptions[index] = e.target.value;
-                            setLiveQuiz({ ...liveQuiz, options: newOptions });
-                          }}
-                          className="mt-1"
-                        />
-                      </div>
-                    ))}
-                  </div>
-                  
-                  <div>
-                    <label className="text-sm font-medium">Correct Answer</label>
-                    <select
-                      value={liveQuiz.correct}
-                      onChange={(e) => setLiveQuiz({ ...liveQuiz, correct: parseInt(e.target.value) })}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                    >
-                      {liveQuiz.options.map((option, index) => (
-                        <option key={index} value={index}>
-                          Option {index + 1}: {option || "Enter option"}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  
-                  {liveQuizError && (
-                    <div className="text-red-600 text-sm">{liveQuizError}</div>
-                  )}
-                  
-                  {liveQuizSuccess && (
-                    <div className="text-green-600 text-sm">Live quiz updated successfully!</div>
-                  )}
-                  
-                  <Button type="submit" disabled={liveQuizLoading}>
-                    {liveQuizLoading ? "Updating..." : "Update Live Quiz"}
-                  </Button>
-                </form>
+                <div className="text-gray-600">To run a quiz, first add questions to a quiz, then use the Set as Current Quiz action in the quizzes table below.</div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -648,7 +804,7 @@ export default function AdminPage() {
                       <div className="text-red-600 text-sm">{quizSubmitError}</div>
                     )}
                     
-                    <Button type="submit" disabled={quizSubmitting} className="w-full">
+                    <Button type="submit" disabled={quizSubmitting || !newQuiz.title.trim() || !newQuiz.difficulty.trim() || !newQuiz.date.trim() || !newQuiz.time.trim()} className="w-full">
                       {quizSubmitting ? "Creating..." : "Create Quiz"}
                     </Button>
                   </form>
@@ -705,6 +861,10 @@ export default function AdminPage() {
                                   <Trash2 className="w-4 h-4 mr-2" />
                                   Delete
                                 </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleSetQuizAsLive(quiz._id)}>
+                                  <Brain className="w-4 h-4 mr-2" />
+                                  Set as Current Quiz
+                                </DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </TableCell>
@@ -712,6 +872,12 @@ export default function AdminPage() {
                       ))}
                     </TableBody>
                   </Table>
+                )}
+                {liveQuizUpdateError && (
+                  <div className="text-red-600 text-sm mb-2">{liveQuizUpdateError}</div>
+                )}
+                {liveQuizUpdateSuccess && (
+                  <div className="text-green-600 text-sm mb-2">{liveQuizUpdateSuccess}</div>
                 )}
               </CardContent>
             </Card>
@@ -866,86 +1032,84 @@ export default function AdminPage() {
                   onChange={(e) => setNewQuestion({ ...newQuestion, question: e.target.value })}
                 />
               </div>
-              
-              <div className="grid gap-4 md:grid-cols-2">
-                {newQuestion.options.map((option, index) => (
-                  <div key={index}>
-                    <label className="text-sm font-medium">Option {index + 1}</label>
-                    <Input
-                      placeholder={`Option ${index + 1}`}
-                      value={option}
-                      onChange={(e) => {
-                        const newOptions = [...newQuestion.options];
-                        newOptions[index] = e.target.value;
-                        setNewQuestion({ ...newQuestion, options: newOptions });
-                      }}
-                    />
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleOptionDragEnd}>
+                <SortableContext items={newQuestion.options.map((_, i) => i.toString())} strategy={verticalListSortingStrategy}>
+                  <div className="space-y-2">
+                    {newQuestion.options.map((option, index) => (
+                      <SortableItem key={index} id={index.toString()} className="flex items-center gap-2">
+                        <input
+                          type="radio"
+                          checked={newQuestion.correct === index}
+                          onChange={() => setNewQuestion({ ...newQuestion, correct: index })}
+                          className="accent-blue-600"
+                          aria-label={`Mark option ${index + 1} as correct`}
+                        />
+                        <Input
+                          placeholder={`Option ${index + 1}`}
+                          value={option}
+                          onChange={(e) => {
+                            const newOptions = [...newQuestion.options];
+                            newOptions[index] = e.target.value;
+                            setNewQuestion({ ...newQuestion, options: newOptions });
+                          }}
+                        />
+                        <Button type="button" variant="ghost" size="icon" onClick={() => handleRemoveOption(index)} disabled={newQuestion.options.length <= 2} aria-label="Remove option">
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </SortableItem>
+                    ))}
                   </div>
-                ))}
-              </div>
-              
-              <div>
-                <label className="text-sm font-medium">Correct Answer</label>
-                <select
-                  value={newQuestion.correct}
-                  onChange={(e) => setNewQuestion({ ...newQuestion, correct: parseInt(e.target.value) })}
-                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                >
-                  {newQuestion.options.map((option, index) => (
-                    <option key={index} value={index}>
-                      Option {index + 1}: {option || "Enter option"}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              
+                </SortableContext>
+              </DndContext>
+              <Button type="button" variant="outline" onClick={handleAddOption} disabled={newQuestion.options.length >= 6}>
+                <Plus className="w-4 h-4 mr-2" /> Add Option
+              </Button>
               {questionError && (
                 <div className="text-red-600 text-sm">{questionError}</div>
               )}
-              
-              <Button type="submit" disabled={questionSubmitting}>
+              <Button type="submit" disabled={questionSubmitting || !currentQuizId}>
                 {questionSubmitting ? "Adding..." : "Add Question"}
               </Button>
             </form>
-
-            {/* Existing Questions */}
-            <div>
-              <h3 className="font-medium mb-4">Existing Questions ({quizQuestions.length})</h3>
-              <div className="space-y-4">
-                {quizQuestions.map((question, index) => (
-                  <div key={question._id || index} className="p-4 border rounded-lg">
-                    <div className="flex justify-between items-start mb-2">
-                      <h4 className="font-medium">Question {index + 1}</h4>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDeleteQuestion(question._id)}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                    <p className="text-sm mb-3">{question.question}</p>
-                    <div className="space-y-1">
-                      {question.options.map((option, optIndex) => (
-                        <div
-                          key={optIndex}
-                          className={`text-sm p-2 rounded ${
-                            optIndex === question.correct
-                              ? "bg-green-100 text-green-800"
-                              : "bg-gray-100"
-                          }`}
-                        >
-                          {optIndex + 1}. {option}
-                          {optIndex === question.correct && (
-                            <span className="ml-2 text-xs">✓ Correct</span>
-                          )}
+            {/* Existing Questions with drag-and-drop */}
+            <h3 className="font-medium mb-4">Existing Questions ({quizQuestions.length})</h3>
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleQuestionsDragEnd}>
+              <SortableContext items={quizQuestions.map((q) => q._id)} strategy={verticalListSortingStrategy}>
+                <div className="space-y-4">
+                  {quizQuestions.map((question, index) => (
+                    <SortableItem key={question._id || index} id={question._id} className="p-4 border rounded-lg">
+                      <div className="flex justify-between items-start mb-2">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">Question {index + 1}</span>
                         </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteQuestion(question._id)}
+                          aria-label="Delete question"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                      <p className="text-sm mb-3">{question.question}</p>
+                      <div className="space-y-1">
+                        {question.options.map((option, optIndex) => (
+                          <div
+                            key={optIndex}
+                            className={`text-sm p-2 rounded ${optIndex === question.correct ? "bg-green-100 text-green-800" : "bg-gray-100"}`}
+                          >
+                            {optIndex + 1}. {option}
+                            {optIndex === question.correct && (
+                              <span className="ml-2 text-xs">✓ Correct</span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </SortableItem>
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
           </div>
         </DialogContent>
       </Dialog>

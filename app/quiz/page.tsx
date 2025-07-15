@@ -19,10 +19,12 @@ import {
   Zap,
   Brain,
   BookOpen,
+  Lock,
 } from "lucide-react";
 import LeaderboardChart from "@/components/charts/leaderboard-chart";
 import PerformanceChart from "@/components/charts/performance-chart";
 import Link from "next/link";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
 function useCountdown(seconds: number) {
   const [timeLeft, setTimeLeft] = useState(seconds);
@@ -41,6 +43,10 @@ export default function QuizPage() {
   const [upcomingQuizzes, setUpcomingQuizzes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const timer = useCountdown(60 * 60); // 1 hour
+  const [selectedPastQuiz, setSelectedPastQuiz] = useState<any | null>(null);
+  const [quizSummary, setQuizSummary] = useState<any | null>(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [summaryOpen, setSummaryOpen] = useState(false);
 
   useEffect(() => {
     async function fetchQuizzes() {
@@ -52,31 +58,35 @@ export default function QuizPage() {
         setUpcomingQuizzes(data);
       } catch (error) {
         console.error("Error fetching quizzes:", error);
-        // Fallback data if API fails
-        setUpcomingQuizzes([
-          {
-            title: "Weekly General Knowledge",
-            difficulty: "Intermediate",
-            date: "June 15, 2023",
-            time: "3:00 PM",
-            participants: 45,
-            prize: "Certificate + Badge"
-          },
-          {
-            title: "Science Quiz Challenge",
-            difficulty: "Advanced",
-            date: "June 18, 2023",
-            time: "4:30 PM",
-            participants: 32,
-            prize: "Trophy + Certificate"
-          }
-        ]);
+        setUpcomingQuizzes([]);
       } finally {
         setLoading(false);
       }
     }
     fetchQuizzes();
   }, []);
+
+  useEffect(() => {
+    console.log("Fetched quizzes:", upcomingQuizzes);
+  }, [upcomingQuizzes]);
+
+  // Filter and sort quizzes by date/time
+  const now = new Date();
+  const quizzesWithDate = upcomingQuizzes.map((quiz) => {
+    let quizDateTime: Date | null = null;
+    if (quiz.date && quiz.time) {
+      quizDateTime = new Date(`${quiz.date}T${quiz.time}`);
+    } else if (quiz.date) {
+      quizDateTime = new Date(quiz.date);
+    }
+    return { ...quiz, quizDateTime };
+  });
+  const futureQuizzes = quizzesWithDate
+    .filter((quiz) => quiz.quizDateTime && quiz.quizDateTime > now)
+    .sort((a, b) => (a.quizDateTime as Date).getTime() - (b.quizDateTime as Date).getTime());
+  const pastQuizzes = quizzesWithDate
+    .filter((quiz) => quiz.quizDateTime && quiz.quizDateTime <= now)
+    .sort((a, b) => (b.quizDateTime as Date).getTime() - (a.quizDateTime as Date).getTime());
 
   const quickStats = [
     { label: "Total Participants", value: "2,450", icon: Users, color: "text-blue-600" },
@@ -85,181 +95,255 @@ export default function QuizPage() {
     { label: "Active Players", value: "89", icon: Zap, color: "text-orange-600" },
   ];
 
-  return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-        {/* Header */}
-        <div className="text-center mb-6 sm:mb-8">
-          <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-gray-800 mb-3 sm:mb-4 flex items-center justify-center gap-2">
-            <span role="img" aria-label="quiz">🧠</span> Live Quiz Arena
-          </h1>
-          <p className="text-base sm:text-lg md:text-xl text-gray-600 max-w-3xl mx-auto px-4">
-            Test your knowledge, compete with peers, and climb the leaderboard in our interactive quiz sessions
-          </p>
-        </div>
+  async function handleOpenPastQuizSummary(quiz: any) {
+    setSelectedPastQuiz(quiz);
+    setSummaryOpen(true);
+    setSummaryLoading(true);
+    try {
+      // Fetch full quiz details (including questions)
+      const res = await fetch(`/api/quiz/${quiz._id}`);
+      if (!res.ok) throw new Error("Failed to fetch quiz details");
+      const data = await res.json();
+      setQuizSummary(data);
+    } catch (e) {
+      setQuizSummary(null);
+    } finally {
+      setSummaryLoading(false);
+    }
+  }
 
-        {/* Live Now Banner */}
-        <div className="mb-6 sm:mb-8">
-          <div className="rounded-lg sm:rounded-xl bg-gradient-to-r from-red-500 to-pink-500 text-white flex flex-col lg:flex-row items-center justify-between px-4 sm:px-6 lg:px-8 py-4 sm:py-6 shadow-lg">
-            <div className="flex items-center gap-3 sm:gap-4 mb-4 lg:mb-0 w-full lg:w-auto">
-              <span className="flex items-center text-sm sm:text-base">
-                <span className="w-2 h-2 sm:w-3 sm:h-3 bg-red-400 rounded-full mr-2 animate-pulse"></span>
-                LIVE NOW: Weekly General Quiz
-              </span>
-              <span className="hidden sm:inline-block text-pink-100 ml-4 text-sm">Join 89 students currently participating</span>
-            </div>
-            <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-4 w-full lg:w-auto">
-              <Button asChild className="bg-white text-red-600 hover:bg-red-50 w-full sm:w-auto text-sm sm:text-base" size="lg">
-                <Link href="/quiz/live">
-                  <Play className="mr-2 w-4 h-4 sm:w-5 sm:h-5" /> 
-                  Join Live Quiz
-                </Link>
-              </Button>
-              <Button variant="outline" className="border-white text-white hover:bg-white hover:text-red-600 bg-transparent w-full sm:w-auto text-sm sm:text-base" size="lg">
-                <Users className="mr-2 w-4 h-4 sm:w-5 sm:h-5" /> 
-                View Live Participants
-              </Button>
-            </div>
-            <div className="text-center lg:text-right mt-4 lg:mt-0 lg:ml-8 w-full lg:w-auto">
-              <div className="text-xl sm:text-2xl font-bold">{timer}</div>
-              <div className="text-pink-100 text-xs sm:text-sm">Time Remaining</div>
-            </div>
-          </div>
+  function handleCloseSummary() {
+    setSummaryOpen(false);
+    setQuizSummary(null);
+    setSelectedPastQuiz(null);
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4 sm:p-6 lg:p-8">
+      <div className="max-w-7xl mx-auto space-y-8">
+        {/* Header */}
+        <div className="text-center space-y-4">
+          <h1 className="text-4xl font-bold text-gray-900">Quiz Arena</h1>
+          <p className="text-xl text-gray-600">Test your knowledge and compete with others</p>
         </div>
 
         {/* Quick Stats */}
-        <div className="grid gap-3 sm:gap-4 md:gap-6 md:grid-cols-2 lg:grid-cols-4 mb-6 sm:mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {quickStats.map((stat, index) => (
-            <Card key={index} className="hover:shadow-lg transition-shadow">
-              <CardContent className="p-4 sm:p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs sm:text-sm text-gray-600 mb-1">{stat.label}</p>
-                    <p className="text-lg sm:text-xl md:text-2xl font-bold text-gray-800">{stat.value}</p>
-                  </div>
-                  <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gray-100 flex items-center justify-center ${stat.color}`}>
-                    <stat.icon className="w-5 h-5 sm:w-6 sm:h-6" />
-                  </div>
-                </div>
+            <Card key={index} className="text-center">
+              <CardContent className="p-4">
+                <stat.icon className={`w-8 h-8 mx-auto mb-2 ${stat.color}`} />
+                <div className="text-2xl font-bold text-gray-900">{stat.value}</div>
+                <div className="text-sm text-gray-600">{stat.label}</div>
               </CardContent>
             </Card>
           ))}
         </div>
 
-        {/* Main Content Tabs */}
-        <Tabs defaultValue="leaderboard" className="space-y-6 sm:space-y-8">
-          <TabsList className="grid w-full grid-cols-2 gap-1 lg:w-auto lg:grid-cols-4">
-            <TabsTrigger value="leaderboard" className="flex items-center justify-center space-x-1 text-xs sm:text-sm">
-              <Trophy className="w-3 h-3 sm:w-4 sm:h-4" />
-              <span className="hidden sm:inline">Leaderboard</span>
-              <span className="sm:hidden">Board</span>
-            </TabsTrigger>
-            <TabsTrigger value="performance" className="flex items-center justify-center space-x-1 text-xs sm:text-sm">
-              <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4" />
-              <span className="hidden sm:inline">Performance</span>
-              <span className="sm:hidden">Perf</span>
-            </TabsTrigger>
-            <TabsTrigger value="upcoming" className="flex items-center justify-center space-x-1 text-xs sm:text-sm">
-              <Calendar className="w-3 h-3 sm:w-4 sm:h-4" />
-              <span className="hidden sm:inline">Upcoming</span>
-              <span className="sm:hidden">Events</span>
-            </TabsTrigger>
-            <TabsTrigger value="practice" className="flex items-center justify-center space-x-1 text-xs sm:text-sm">
-              <Brain className="w-3 h-3 sm:w-4 sm:h-4" />
-              <span className="hidden sm:inline">Practice</span>
-              <span className="sm:hidden">Quiz</span>
-            </TabsTrigger>
+        {/* Main Content */}
+        <Tabs defaultValue="upcoming" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="upcoming">Upcoming Quizzes</TabsTrigger>
+            <TabsTrigger value="leaderboard">Leaderboard</TabsTrigger>
+            <TabsTrigger value="performance">Performance</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="leaderboard" className="space-y-6 sm:space-y-8">
-            <LeaderboardChart />
-          </TabsContent>
-
-          <TabsContent value="performance" className="space-y-6 sm:space-y-8">
-            <PerformanceChart />
-          </TabsContent>
-
-          <TabsContent value="upcoming" className="space-y-6 sm:space-y-8">
+          <TabsContent value="upcoming" className="space-y-6">
             {loading ? (
-              <div className="text-center py-8 sm:py-12 text-base sm:text-lg text-muted-foreground">Loading quizzes...</div>
-            ) : (
-              <div className="grid gap-4 sm:gap-6">
-                {upcomingQuizzes.length === 0 ? (
-                  <div className="text-center text-muted-foreground">No upcoming quizzes found.</div>
-                ) : (
-                  upcomingQuizzes.map((quiz, index) => (
-                    <Card key={index} className="hover:shadow-lg transition-shadow">
-                      <CardHeader className="px-4 sm:px-6">
-                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0">
-                          <CardTitle className="text-lg sm:text-xl">{quiz.title}</CardTitle>
-                          <Badge variant="outline" className="bg-blue-50 text-blue-700 w-fit">
-                            {quiz.difficulty}
-                          </Badge>
-                        </div>
-                        <CardDescription className="text-sm sm:text-base">Compete with students and win exciting prizes</CardDescription>
-                      </CardHeader>
-                      <CardContent className="px-4 sm:px-6">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-6">
-                          <div className="flex items-center space-x-2">
-                            <Calendar className="w-4 h-4 text-gray-500" />
-                            <span className="text-xs sm:text-sm">{quiz.date}</span>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <Clock className="w-4 h-4 text-gray-500" />
-                            <span className="text-xs sm:text-sm">{quiz.time}</span>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <Users className="w-4 h-4 text-gray-500" />
-                            <span className="text-xs sm:text-sm">{quiz.participants} registered</span>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <Trophy className="w-4 h-4 text-gray-500" />
-                            <span className="text-xs sm:text-sm">{quiz.prize}</span>
-                          </div>
-                        </div>
-                        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
-                          <Button className="bg-blue-600 hover:bg-blue-700 text-sm sm:text-base">Register Now</Button>
-                          <Button variant="outline" className="text-sm sm:text-base">Set Reminder</Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))
-                )}
+              <div className="text-center py-12">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+                <p className="mt-4 text-gray-600">Loading quizzes...</p>
               </div>
+            ) : (
+              <>
+                {/* Upcoming Quizzes */}
+                <h2 className="text-2xl font-bold mb-2">Upcoming Quizzes</h2>
+                {futureQuizzes.length > 0 ? (
+                  <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-8">
+                    {futureQuizzes.map((quiz, index) => (
+                      <Card key={index} className="hover:shadow-lg transition-shadow">
+                        <CardHeader>
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <CardTitle className="text-lg">{quiz.title}</CardTitle>
+                              <CardDescription className="mt-2">
+                                <div className="flex items-center gap-2 text-sm text-gray-600">
+                                  <Calendar className="w-4 h-4" />
+                                  {quiz.date} at {quiz.time}
+                                </div>
+                              </CardDescription>
+                            </div>
+                            <Badge variant={quiz.difficulty === "Easy" ? "default" : quiz.difficulty === "Intermediate" ? "secondary" : "destructive"}>
+                              {quiz.difficulty}
+                            </Badge>
+                          </div>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600">Participants</span>
+                            <span className="font-medium">{quiz.participants || 0}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600">Prize</span>
+                            <span className="font-medium">{quiz.prize || "Certificate"}</span>
+                          </div>
+                          <Button className="w-full" asChild>
+                            <Link href={`/quiz/live`}>
+                              <Play className="w-4 h-4 mr-2" />
+                              Join Quiz
+                            </Link>
+                          </Button>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                ) : (
+                  <Card className="text-center py-12 mb-8">
+                    <CardContent>
+                      <Brain className="w-16 h-16 mx-auto mb-4 text-gray-400" />
+                      <h3 className="text-xl font-semibold mb-2">No upcoming quizzes</h3>
+                      <p className="text-gray-600 mb-4">Check back later for new quiz challenges!</p>
+                    </CardContent>
+                  </Card>
+                )}
+                {/* Past Quizzes */}
+                <h2 className="text-2xl font-bold mb-2">Past Quizzes</h2>
+                {pastQuizzes.length > 0 ? (
+                  <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                    {pastQuizzes.map((quiz, index) => (
+                      <div key={index} className="relative">
+                        <Card
+                          className="opacity-60 cursor-pointer hover:opacity-80 transition pointer-events-auto"
+                          onClick={() => handleOpenPastQuizSummary(quiz)}
+                        >
+                          <CardHeader>
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <CardTitle className="text-lg flex items-center gap-2">
+                                  <Lock className="w-5 h-5 text-gray-400" />
+                                  {quiz.title}
+                                </CardTitle>
+                                <CardDescription className="mt-2">
+                                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                                    <Calendar className="w-4 h-4" />
+                                    {quiz.date} at {quiz.time}
+                                  </div>
+                                </CardDescription>
+                              </div>
+                              <Badge variant="outline" className="flex items-center gap-1"><Lock className="w-3 h-3" /> Locked</Badge>
+                            </div>
+                          </CardHeader>
+                          <CardContent className="space-y-4">
+                            <div className="flex justify-between text-sm">
+                              <span className="text-gray-600">Participants</span>
+                              <span className="font-medium">{quiz.participants || 0}</span>
+                            </div>
+                            <div className="flex justify-between text-sm">
+                              <span className="text-gray-600">Prize</span>
+                              <span className="font-medium">{quiz.prize || "Certificate"}</span>
+                            </div>
+                          </CardContent>
+                          <div className="absolute inset-0 bg-gray-200 opacity-40 rounded-lg pointer-events-none" />
+                        </Card>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <Card className="text-center py-12">
+                    <CardContent>
+                      <BookOpen className="w-16 h-16 mx-auto mb-4 text-gray-400" />
+                      <h3 className="text-xl font-semibold mb-2">No past quizzes</h3>
+                      <p className="text-gray-600 mb-4">You haven't missed any quizzes yet!</p>
+                    </CardContent>
+                  </Card>
+                )}
+              </>
             )}
           </TabsContent>
 
-          <TabsContent value="practice" className="space-y-6 sm:space-y-8">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-              {[
-                { title: "General Knowledge", questions: 50, difficulty: "Mixed", icon: Brain },
-                { title: "Science & Tech", questions: 30, difficulty: "Advanced", icon: Zap },
-                { title: "History & Culture", questions: 40, difficulty: "Intermediate", icon: BookOpen },
-                { title: "Mathematics", questions: 25, difficulty: "Advanced", icon: Target },
-                { title: "Literature", questions: 35, difficulty: "Intermediate", icon: BookOpen },
-                { title: "Current Affairs", questions: 45, difficulty: "Mixed", icon: TrendingUp },
-              ].map((category, index) => (
-                <Card key={index} className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
-                  <CardHeader className="text-center px-4 sm:px-6">
-                    <div className="w-12 h-12 sm:w-16 sm:h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4">
-                      <category.icon className="w-6 h-6 sm:w-8 sm:h-8 text-blue-600" />
-                    </div>
-                    <CardTitle className="text-base sm:text-lg">{category.title}</CardTitle>
-                    <CardDescription className="text-xs sm:text-sm">
-                      {category.questions} questions &bull; {category.difficulty}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="px-4 sm:px-6">
-                    <Button className="w-full text-sm sm:text-base">
-                      <Play className="mr-2 w-3 h-3 sm:w-4 sm:h-4" />
-                      Start Practice
-                    </Button>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+          <TabsContent value="leaderboard" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Top Performers</CardTitle>
+                <CardDescription>This week's leaderboard</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <LeaderboardChart />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="performance" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Your Performance</CardTitle>
+                <CardDescription>Track your quiz performance over time</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <PerformanceChart />
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
+
+            {/* Past Quiz Summary Modal */}
+            <Dialog open={summaryOpen} onOpenChange={handleCloseSummary}>
+              <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>Quiz Summary</DialogTitle>
+                  <DialogDescription>
+                    {selectedPastQuiz ? (
+                      <span>
+                        {selectedPastQuiz.title} <br />
+                        {selectedPastQuiz.date} at {selectedPastQuiz.time}
+                      </span>
+                    ) : null}
+                  </DialogDescription>
+                </DialogHeader>
+                {summaryLoading ? (
+                  <div className="text-center py-8">Loading...</div>
+                ) : quizSummary ? (
+                  <div className="space-y-4">
+                    {/* Debug: Show raw quizSummary object */}
+                    <pre className="bg-gray-100 p-2 rounded text-xs overflow-x-auto mb-2">{JSON.stringify(quizSummary, null, 2)}</pre>
+                    <div className="flex flex-wrap gap-4 text-sm">
+                      <span><strong>Participants:</strong> {quizSummary.participants || 0}</span>
+                      <span><strong>Prize:</strong> {quizSummary.prize || "Certificate"}</span>
+                      {/* Add more stats as needed */}
+                    </div>
+                    <div>
+                      <h4 className="font-semibold mb-2">Questions & Answers</h4>
+                      <div className="space-y-3">
+                        {quizSummary.questions && quizSummary.questions.length > 0 ? (
+                          quizSummary.questions.map((q: any, idx: number) => (
+                            <div key={q._id || idx} className="p-3 border rounded">
+                              <div className="font-medium mb-1">Q{idx + 1}: {q.text}</div>
+                              <ul className="ml-4 list-disc">
+                                {q.options.map((opt: string, oidx: number) => (
+                                  <li key={oidx} className={oidx === q.answer ? "text-green-700 font-semibold" : ""}>
+                                    {opt} {oidx === q.answer && <span className="ml-2 text-xs">✓ Correct</span>}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          ))
+                        ) : (
+                          <div>No questions found.</div>
+                        )}
+                      </div>
+                    </div>
+                    {/* User's own score (if available) */}
+                    {quizSummary.userScore !== undefined && (
+                      <div className="mt-4 p-3 bg-blue-50 rounded text-blue-800 font-semibold">
+                        Your Score: {quizSummary.userScore}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-red-600">Failed to load quiz summary.</div>
+                )}
+              </DialogContent>
+            </Dialog>
       </div>
     </div>
   );

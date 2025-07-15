@@ -10,7 +10,7 @@ const nextConfig = {
     unoptimized: true,
   },
   webpack: (config, { isServer }) => {
-    // Handle MongoDB optional dependencies
+    // Handle MongoDB optional dependencies for client-side
     if (!isServer) {
       config.resolve.fallback = {
         ...config.resolve.fallback,
@@ -34,20 +34,6 @@ const nextConfig = {
         'snappy': false,
         'aws4': false,
       };
-    }
-
-    // Ignore specific MongoDB modules that cause issues
-    config.externals = config.externals || [];
-    if (!isServer) {
-      config.externals.push({
-        'mongodb-client-encryption': 'mongodb-client-encryption',
-        'kerberos': 'kerberos',
-        '@mongodb-js/zstd': '@mongodb-js/zstd',
-        '@aws-sdk/credential-providers': '@aws-sdk/credential-providers',
-        'snappy': 'snappy',
-        'aws4': 'aws4',
-        'dns': 'dns',
-      });
     }
 
     return config;

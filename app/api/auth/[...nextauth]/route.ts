@@ -6,13 +6,7 @@ import { compare } from "bcryptjs";
 import type { SessionStrategy } from "next-auth";
 import type { JWT } from "next-auth/jwt";
 import type { Session } from "next-auth";
-
-// Define user roles
-export enum UserRole {
-  USER = "user",
-  ADMIN = "admin",
-  MODERATOR = "moderator"
-}
+import { UserRole } from "@/lib/user-role";
 
 // Extend the default session type
 declare module "next-auth" {

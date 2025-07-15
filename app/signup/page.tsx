@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Eye, EyeOff, Loader2, Check, X } from "lucide-react";
-import { UserRole } from "@/app/api/auth/[...nextauth]/route";
+import { UserRole } from "@/lib/user-role";
 
 interface PasswordRequirement {
   id: string;
@@ -34,7 +34,24 @@ export default function SignupPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [isFirstUser, setIsFirstUser] = useState(false);
   const router = useRouter();
+
+  // Check if this is the first user
+  useEffect(() => {
+    async function checkFirstUser() {
+      try {
+        const res = await fetch("/api/auth/check-first-user");
+        if (res.ok) {
+          const data = await res.json();
+          setIsFirstUser(data.isFirstUser);
+        }
+      } catch (error) {
+        console.error("Error checking first user status:", error);
+      }
+    }
+    checkFirstUser();
+  }, []);
 
   const validatePassword = (password: string) => {
     return passwordRequirements.map(req => ({
@@ -90,17 +107,24 @@ export default function SignupPage() {
           name: formData.name.trim(),
           email: formData.email.toLowerCase().trim(),
           password: formData.password,
-          role: UserRole.USER, // Default role for new registrations
         }),
       });
 
       const data = await res.json();
 
       if (res.ok && data.success) {
-        setSuccess("Account created successfully! Redirecting to login...");
-        setTimeout(() => {
-          router.push("/login?message=Account created successfully. Please sign in.");
-        }, 2000);
+        if (data.isFirstUser) {
+          setIsFirstUser(true);
+          setSuccess("Admin account created successfully! Redirecting to admin panel...");
+          setTimeout(() => {
+            router.push("/admin");
+          }, 2000);
+        } else {
+          setSuccess("Account created successfully! Redirecting to login...");
+          setTimeout(() => {
+            router.push("/login?message=Account created successfully. Please sign in.");
+          }, 2000);
+        }
       } else {
         setError(data.error || "Registration failed. Please try again.");
       }
@@ -119,8 +143,15 @@ export default function SignupPage() {
             <span className="text-white text-2xl font-bold">S</span>
           </div>
           <div>
-            <CardTitle className="text-2xl font-bold text-gray-900">Create Account</CardTitle>
-            <p className="text-gray-600 mt-2">Join the SA'ADA Students' Union community</p>
+            <CardTitle className="text-2xl font-bold text-gray-900">
+              {isFirstUser ? "Create Admin Account" : "Create Account"}
+            </CardTitle>
+            <p className="text-gray-600 mt-2">
+              {isFirstUser 
+                ? "You're the first user! You'll become the system administrator."
+                : "Join the SA'ADA Students' Union community"
+              }
+            </p>
           </div>
         </CardHeader>
 
@@ -264,10 +295,10 @@ export default function SignupPage() {
               {loading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Creating account...
+                  {isFirstUser ? "Creating admin account..." : "Creating account..."}
                 </>
               ) : (
-                "Create Account"
+                isFirstUser ? "Create Admin Account" : "Create Account"
               )}
             </Button>
 

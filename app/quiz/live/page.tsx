@@ -32,7 +32,7 @@ export default function LiveQuizPage() {
   useEffect(() => {
     async function fetchQuiz() {
       setLoading(true);
-      const res = await fetch("/api/live-quiz");
+      const res = await fetch("/api/current-quiz");
       const data = await res.json();
       if (data && data.questions && Array.isArray(data.questions) && data.questions.length > 0) {
         setQuiz(data);

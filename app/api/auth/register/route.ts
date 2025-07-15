@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import clientPromise from "@/lib/mongodb";
 import { hash } from "bcryptjs";
-import { UserRole } from "../[...nextauth]/route";
+import { UserRole } from "@/lib/user-role";
 
 // Validation function
 function validateEmail(email: string): boolean {
@@ -62,14 +62,6 @@ export async function POST(req: Request) {
       );
     }
 
-    // Validate role
-    if (!Object.values(UserRole).includes(role)) {
-      return NextResponse.json(
-        { error: "Invalid user role" },
-        { status: 400 }
-      );
-    }
-
     const client = await clientPromise;
     const users = client.db().collection("users");
 
@@ -82,6 +74,13 @@ export async function POST(req: Request) {
       );
     }
 
+    // Check if this is the first user (no users in database)
+    const userCount = await users.countDocuments();
+    const isFirstUser = userCount === 0;
+    
+    // Determine role: first user becomes admin, others become regular users
+    const userRole = isFirstUser ? UserRole.ADMIN : UserRole.USER;
+
     // Hash password
     const hashedPassword = await hash(password, 12);
 
@@ -90,7 +89,7 @@ export async function POST(req: Request) {
       name: name.trim(),
       email: email.toLowerCase(),
       password: hashedPassword,
-      role: role,
+      role: userRole,
       status: "active",
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -130,13 +129,16 @@ export async function POST(req: Request) {
     // Return success response (without sensitive data)
     return NextResponse.json({
       success: true,
-      message: "User registered successfully",
+      message: isFirstUser 
+        ? "Admin account created successfully! You can now access the admin panel." 
+        : "User registered successfully",
       user: {
         id: result.insertedId.toString(),
         name: userData.name,
         email: userData.email,
         role: userData.role,
       },
+      isFirstUser: isFirstUser,
     });
 
   } catch (error) {

@@ -1,0 +1,25 @@
+﻿
+
+StatusCode        : 200
+StatusDescription : OK
+Content           : [{"_id":"6874d5ff9a658eff2ed57aed","title":"quran 
+                    quiz","isLive":true,"createdAt":"2025-07-14T10:03:43.465Z","questions":[{"text":"which 
+                    is best","options":["r","h","t"],"answer":1,"_id":"6874dafb9a65...
+RawContent        : HTTP/1.1 200 OK
+                    vary: RSC, Next-Router-State-Tree, Next-Router-Prefetch, Next-Router-Segment-Prefetch
+                    Connection: keep-alive
+                    Keep-Alive: timeout=5
+                    Transfer-Encoding: chunked
+                    Content-Type: applica...
+Forms             : {}
+Headers           : {[vary, RSC, Next-Router-State-Tree, Next-Router-Prefetch, 
+                    Next-Router-Segment-Prefetch], [Connection, keep-alive], [Keep-Alive, timeout=5], 
+                    [Transfer-Encoding, chunked]...}
+Images            : {}
+InputFields       : {}
+Links             : {}
+ParsedHtml        : mshtml.HTMLDocumentClass
+RawContentLength  : 313
+
+
+

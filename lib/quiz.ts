@@ -18,6 +18,10 @@ export interface IQuiz extends Document {
   questions: IQuestion[];
   isLive: boolean;
   createdAt: Date;
+  date: string;
+  time: string;
+  prize: string;
+  participants: number;
 }
 
 const QuizSchema = new Schema<IQuiz>({
@@ -25,6 +29,10 @@ const QuizSchema = new Schema<IQuiz>({
   questions: { type: [QuestionSchema], default: [] },
   isLive: { type: Boolean, default: false },
   createdAt: { type: Date, default: Date.now },
+  date: { type: String, required: true },
+  time: { type: String, required: true },
+  prize: { type: String, default: "" },
+  participants: { type: Number, default: 0 },
 });
 
 export const Question: Model<IQuestion> = getModel<IQuestion>("Question", QuestionSchema);
