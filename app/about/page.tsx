@@ -121,11 +121,11 @@ export default function AboutPage() {
 
             <div className="relative order-1 lg:order-2">
               <Image
-                src="/placeholder.svg?height=400&width=500"
+                src="/about.png"
                 alt="SA'ADA Students Union"
-                width={500}
-                height={400}
-                className="rounded-lg sm:rounded-xl lg:rounded-2xl shadow-xl w-full h-auto"
+                width={1200}
+                height={350}
+                className="rounded-lg sm:rounded-xl lg:rounded-2xl shadow-xl w-full object-cover h-[250px] sm:h-[300px] lg:h-[350px]"
               />
             </div>
           </div>
