@@ -66,10 +66,10 @@ export default function AboutPage() {
 
   const leadership = [
     {
-      name: "Ahmed Al-Rashid",
+      name: "Anshid",
       position: "President",
       description: "Leading the union with vision and dedication to student welfare.",
-      image: "/placeholder.svg?height=200&width=200",
+      image: "/anshid 1st.png",
     },
     {
       name: "Adheeb",
@@ -78,10 +78,22 @@ export default function AboutPage() {
       image: "/adheeb.png",
     },
     {
-      name: "Omar Khalil",
-      position: "Secretary General",
-      description: "Managing communications and maintaining organizational records.",
-      image: "/placeholder.svg?height=200&width=200",
+      name: "Faseeh",
+      position: "Secretary",
+      description: "Responsible for official correspondence and record-keeping.",
+      image: "/faseeh.png",
+    },
+    {
+      name: "Anshid D2",
+      position: "Working Secretary",
+      description: "Assisting in secretarial duties and supporting the union's operations.",
+      image: "/anshid d2.png",
+    },
+    {
+      name: "Anshif",
+      position: "Joint Secretary",
+      description: "Supporting the secretary and managing joint secretarial responsibilities.",
+      image: "/anshif.png",
     },
     {
       name: "Shafin",
