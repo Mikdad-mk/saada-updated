@@ -1,10 +1,13 @@
 "use client";
-import { signIn } from "next-auth/react";
-import { useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import Link from "next/link";
+import { Suspense } from "react";
+import React from "react";
 
-export default function LoginPage() {
+function LoginForm() {
+  const { signIn } = require("next-auth/react");
+  const { useState } = require("react");
+  const { useRouter, useSearchParams } = require("next/navigation");
+  const Link = require("next/link").default;
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -20,7 +23,6 @@ export default function LoginPage() {
     e.preventDefault();
     setError("");
     setLoading(true);
-
     try {
       const res = await signIn("credentials", {
         redirect: false,
@@ -28,7 +30,6 @@ export default function LoginPage() {
         password,
         callbackUrl,
       });
-
       if (res?.error) {
         setError(res.error);
       } else if (res?.ok) {
@@ -48,10 +49,8 @@ export default function LoginPage() {
   const handleDemoLogin = async (role: string) => {
     setLoading(true);
     setError("");
-
     let demoEmail = "";
     let demoPassword = "";
-
     switch (role) {
       case "admin":
         demoEmail = "admin@saada.com";
@@ -66,17 +65,14 @@ export default function LoginPage() {
         demoPassword = "User123!";
         break;
     }
-
     setEmail(demoEmail);
     setPassword(demoPassword);
-
     try {
       const res = await signIn("credentials", {
         redirect: false,
         email: demoEmail,
         password: demoPassword,
       });
-
       if (res?.error) {
         setError(res.error);
       } else if (res?.ok) {
@@ -105,7 +101,6 @@ export default function LoginPage() {
             <p className="text-gray-600 mt-2">Sign in to your SA'ADA Union account</p>
           </div>
         </div>
-
         <form onSubmit={handleSubmit}>
           <div className="space-y-4">
             {(error || urlError) && (
@@ -113,7 +108,6 @@ export default function LoginPage() {
                 {error || urlError}
               </div>
             )}
-
             <div className="space-y-2">
               <label htmlFor="email" className="text-sm font-medium text-gray-700">
                 Email Address
@@ -129,7 +123,6 @@ export default function LoginPage() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 h-11"
               />
             </div>
-
             <div className="space-y-2">
               <label htmlFor="password" className="text-sm font-medium text-gray-700">
                 Password
@@ -155,7 +148,6 @@ export default function LoginPage() {
                 </button>
               </div>
             </div>
-
             <div className="space-y-2">
               <p className="text-xs text-gray-500 text-center">Quick Demo Access:</p>
               <div className="grid grid-cols-3 gap-2">
@@ -186,7 +178,6 @@ export default function LoginPage() {
               </div>
             </div>
           </div>
-
           <div className="mt-6 space-y-4">
             <button 
               type="submit" 
@@ -195,28 +186,21 @@ export default function LoginPage() {
             >
               {loading ? "Signing in..." : "Sign In"}
             </button>
-
             <div className="text-center text-sm text-gray-600">
               Don't have an account?{" "}
-              <Link 
-                href="/signup" 
-                className="text-blue-600 hover:text-blue-700 font-medium hover:underline"
-              >
-                Sign up
-              </Link>
-            </div>
-
-            <div className="text-center text-xs text-gray-500">
-              <Link 
-                href="/forgot-password" 
-                className="hover:text-gray-700 hover:underline"
-              >
-                Forgot your password?
-              </Link>
+              <Link href="/signup" className="text-blue-600 hover:underline font-medium">Sign up</Link>
             </div>
           </div>
         </form>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
   );
 } 
